@@ -6,10 +6,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.dataStore
@@ -27,7 +25,7 @@ class JustTextViewModel(
     private val dataStore: DataStore<Preferences>,
 ) : ViewModel() {
     val initialTextFlow = MutableStateFlow("...")
-    val uiStateFlow = MutableStateFlow(UiState(""))
+    val uiStateFlow = MutableStateFlow(UiState("."))
 
     private val backgroundImageFile = File(applicationContext.filesDir, "background-image.jpg")
     val backgroundImageUri = MutableStateFlow<Uri?>(null)
@@ -43,6 +41,9 @@ class JustTextViewModel(
         val dataStoredText = dataStore.data.map { it[TEXT_KEY] }.first()
         if (dataStoredText != null) {
             initialTextFlow.update { dataStoredText }
+            updateText(dataStoredText)
+        } else {
+            println("no stored text found")
         }
     }
 

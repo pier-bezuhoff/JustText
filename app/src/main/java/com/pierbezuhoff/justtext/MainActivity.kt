@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
             JustTextTheme(darkTheme = true) {
                 HomeScreen(
                     viewModel = viewModel,
+                    quitApp = { finishAndRemoveTask() },
                 )
             }
         }
