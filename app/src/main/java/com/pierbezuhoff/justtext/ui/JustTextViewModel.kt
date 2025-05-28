@@ -44,9 +44,7 @@ class JustTextViewModel(
 
     private fun loadInitialTextFromFile() {
         applicationContext.openFileInput(SAVED_TEXT_FILENAME).bufferedReader().useLines { lines ->
-            val text = lines.fold("") { some, nextLine ->
-                "$some\n$nextLine"
-            }
+            val text = lines.joinToString("\n")
             initialTextFlow.update { text }
             updateText(text)
             println("text loaded")
