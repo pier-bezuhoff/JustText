@@ -5,10 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -16,23 +13,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -58,7 +49,13 @@ fun HomeScreen(
     val initialText by viewModel.initialTextFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     val backgroundImageUri: Uri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                drawRect(Color(uiState.backgroundColor))
+            }
+    ) {
         backgroundImageUri?.let { uri ->
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -79,6 +76,7 @@ fun HomeScreen(
                     navigationIcon = {
                         IconButton(
                             onClick = {
+                                viewModel.persistState()
                                 quitApp()
                             },
                         ) {
@@ -114,69 +112,22 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
                 TextScreen(
-                    initialText,
-                    viewModel::updateText,
+                    initialText = initialText,
+                    textColor = Color(uiState.textColor),
+                    textFieldBackgroundColor = Color(uiState.textFieldBackgroundColor),
+                    onNewText = viewModel::updateText,
                     modifier = modifier
                 )
             }
         }
     }
-}
-
-@Composable
-fun TextScreen(
-    initialText: String,
-    onNewText: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var tfValue by remember(initialText) { mutableStateOf(TextFieldValue(initialText)) }
-//    val lineCount = tfValue.text.count { it == '\n' }
-//    val lineNumbers = remember(lineCount) {
-//        (1..lineCount).joinToString("\n")
-//    }
-    val tfStyle = MaterialTheme.typography.bodyLarge.copy(
-        lineBreak = LineBreak.Paragraph,
-    )
-//    TextOverflow.Visible
-    Column(
-        modifier
-            .imePadding()
-        ,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            Modifier.fillMaxSize()
-        ) {
-//            Text(
-//                text = lineNumbers,
-//                modifier = Modifier
-//                    .width(32.dp)
-//                    .padding(start = 4.dp, end = 4.dp)
-//                ,
-//                color = Color.LightGray
-//            )
-            TextField(
-                tfValue,
-                onValueChange = {
-                    tfValue = it
-                    onNewText(it.text)
-                },
-                modifier = Modifier
-                    .weight(1f)
-                ,
-                textStyle = tfStyle,
-                minLines = 20,
-                maxLines = Int.MAX_VALUE,
-                colors = TextFieldDefaults.colors().copy(
-                    focusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(
-                        alpha = 0.4f,
-                    ),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(
-                        alpha = 0.2f,
-                    ),
-                )
-            )
-        }
+    val defaultTextColor = MaterialTheme.colorScheme.primary
+    val defaultTextFieldBackgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+    val defaultBackgroundColor = MaterialTheme.colorScheme.surface
+    LaunchedEffect(viewModel, defaultTextColor, defaultTextFieldBackgroundColor, defaultBackgroundColor) {
+        viewModel.setDefaultColors(
+            defaultTextColor, defaultTextFieldBackgroundColor, defaultBackgroundColor,
+        )
     }
 }
 
@@ -184,6 +135,6 @@ fun TextScreen(
 @Composable
 fun HomeScreenPreview() {
     JustTextTheme {
-        TextScreen("hi!!!!!", {})
+//        TextScreen("hi!!!!!", {})
     }
 }

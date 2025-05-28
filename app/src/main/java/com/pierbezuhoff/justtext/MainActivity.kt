@@ -35,6 +35,6 @@ class MainActivity : ComponentActivity() {
     // onDestroy doesn't proc, idk why (maybe no compat)
     override fun onPause() {
         super.onPause()
-        viewModel.saveToDatastore()
+        viewModel.persistState()
     }
 }

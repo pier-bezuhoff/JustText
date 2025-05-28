@@ -2,6 +2,7 @@ package com.pierbezuhoff.justtext.ui
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -24,16 +25,31 @@ class JustTextViewModel(
     private val applicationContext: Context,
     private val dataStore: DataStore<Preferences>,
 ) : ViewModel() {
+    val uiStateFlow = MutableStateFlow(UiState(
+        text = ".",
+        textColor = Color.White.value,
+        textFieldBackgroundColor = Color.DarkGray.copy(alpha = 0.4f).value,
+        backgroundColor = Color.Black.value,
+    ))
     val initialTextFlow = MutableStateFlow("...")
-    val uiStateFlow = MutableStateFlow(UiState("."))
-
-    private val backgroundImageFile = File(applicationContext.filesDir, "background-image.jpg")
+    private val backgroundImageFile = File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
     val backgroundImageUri = MutableStateFlow<Uri?>(null)
 
     init {
         viewModelScope.launch {
-            loadInitialTextFromDataStore()
+            loadInitialTextFromFile()
             loadBackgroundImageFromFile()
+        }
+    }
+
+    private fun loadInitialTextFromFile() {
+        applicationContext.openFileInput(SAVED_TEXT_FILENAME).bufferedReader().useLines { lines ->
+            val text = lines.fold("") { some, nextLine ->
+                "$some\n$nextLine"
+            }
+            initialTextFlow.update { text }
+            updateText(text)
+            println("text loaded")
         }
     }
 
@@ -53,15 +69,45 @@ class JustTextViewModel(
         }
     }
 
+    fun setDefaultColors(
+        textColor: Color,
+        textFieldBackgroundColor: Color,
+        backgroundColor: Color,
+    ) {
+        uiStateFlow.update {
+            it.copy(
+                textColor = textColor.value,
+                textFieldBackgroundColor = textFieldBackgroundColor.value,
+                backgroundColor = backgroundColor.value,
+            )
+        }
+    }
+
     fun updateText(newText: String) {
         uiStateFlow.update { it.copy(text = newText) }
     }
 
-    fun saveToDatastore() {
+    fun persistState() {
+        saveTextToFile()
+    }
+
+    fun saveTextToDatastore() {
         runBlocking {
             dataStore.edit { preferences ->
                 preferences[TEXT_KEY] = uiStateFlow.value.text
             }
+        }
+    }
+
+    fun saveTextToFile() {
+        try {
+            val text = uiStateFlow.value.text
+            applicationContext.openFileOutput(SAVED_TEXT_FILENAME, Context.MODE_PRIVATE).use {
+                it.write(text.toByteArray())
+            }
+            println("text saved")
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -98,5 +144,7 @@ class JustTextViewModel(
         }
 
         private val TEXT_KEY = stringPreferencesKey("text")
+        private const val SAVED_TEXT_FILENAME = "saved-text.txt"
+        private const val BACKGROUND_IMAGE_FILENAME = "background-image.jpg"
     }
 }
