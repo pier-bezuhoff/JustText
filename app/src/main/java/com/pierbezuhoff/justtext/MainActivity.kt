@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JustTextTheme(darkTheme = true) {
+            JustTextTheme() {
                 HomeScreen(
                     viewModel = viewModel,
                     quitApp = { finishAndRemoveTask() },

@@ -101,6 +101,7 @@ fun HomeScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     ),
                 )
