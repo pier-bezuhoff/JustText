@@ -2,6 +2,7 @@ package com.pierbezuhoff.justtext.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.MaterialTheme
@@ -48,10 +49,11 @@ fun TextScreen(
                     onNewText(it.text)
                 },
                 modifier = Modifier
+//                    .fillMaxHeight()
                     .weight(1f)
                 ,
                 textStyle = tfStyle,
-                minLines = 30,
+                minLines = 70,
                 maxLines = Int.MAX_VALUE,
                 colors = TextFieldDefaults.colors().copy(
                     focusedContainerColor = textFieldBackgroundColor,

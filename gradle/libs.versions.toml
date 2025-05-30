@@ -10,6 +10,7 @@ activityCompose = "1.10.1"
 datastore = "1.1.7"
 serialization = "1.8.1"
 coil = "3.2.0"
+colormath = "3.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -27,6 +28,8 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 coil = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+colormath = { group = "com.github.ajalt.colormath", name = "colormath", version.ref = "colormath" }
+colormath-compose = { group = "com.github.ajalt.colormath", name = "colormath-ext-jetpack-compose", version.ref = "colormath" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
