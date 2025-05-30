@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Just Text</string>
+    <string name="color_picker_title">Pick a color</string>
+    <string name="color_picker_default_palette_label">Palette</string>
+    <string name="hex_name">hex #</string>
+    <string name="ok_name">OK</string>
+    <string name="cancel_name">Cancel</string>
 </resources>

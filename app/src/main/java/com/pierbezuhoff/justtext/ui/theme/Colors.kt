@@ -62,6 +62,21 @@ private val PurpleGrey40 = Color(0xFF625b71)
 private val Pink40 = Color(0xFF7D5260)
 
 object JustTextColors {
+    val peachyPink = Color(0xFF_FFC0CB)
+    val pinkishRed = Color(0xFF_FF7373)
+    val venousBloodRed = Color(0xFF_800000)
+    val deepBrown = Color(0xFF_321E1E)
+    val orange = Color(0xFF_F08A5D)
+    val orangeOrange = Color(0xFF_FFA500) // my naming is very original
+    val goldenBananaYellow = Color(0xFF_FFD700)
+    val veryDarkForestyGreen = Color(0xFF_065535)
+    val aquamarine = Color(0xFF_08D9D6) // visually similar to cyan
+    val teal = Color(0xFF_008080)
+    val darkPurple = Color(0xFF_6A2C70)
+    val skyBlue = Color(0xff_2ca3ff)
+
+
+
     val b = Color(0xFF_36618e)
     val g = Color(0xFF_4c662b)
     val t = Color(0xFF_6b5f10)
