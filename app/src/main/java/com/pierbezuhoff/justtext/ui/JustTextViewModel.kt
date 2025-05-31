@@ -81,6 +81,30 @@ class JustTextViewModel(
         }
     }
 
+    fun setTextColor(textColor: Color) {
+        uiStateFlow.update {
+            it.copy(
+                textColor = textColor.value,
+            )
+        }
+    }
+
+    fun setTextBackgroundColor(textFieldBackgroundColor: Color) {
+        uiStateFlow.update {
+            it.copy(
+                textFieldBackgroundColor = textFieldBackgroundColor.value,
+            )
+        }
+    }
+
+    fun setBackgroundColor(backgroundColor: Color) {
+        uiStateFlow.update {
+            it.copy(
+                backgroundColor = backgroundColor.value,
+            )
+        }
+    }
+
     fun updateText(newText: String) {
         uiStateFlow.update { it.copy(text = newText) }
     }

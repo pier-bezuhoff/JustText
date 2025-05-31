@@ -1,4 +1,4 @@
-package com.pierbezuhoff.justtext.ui
+package com.pierbezuhoff.justtext.ui.dialogs
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
@@ -75,6 +75,9 @@ import androidx.window.core.layout.WindowWidthSizeClass
 import com.github.ajalt.colormath.RenderCondition
 import com.github.ajalt.colormath.model.RGB
 import com.pierbezuhoff.justtext.R
+import com.pierbezuhoff.justtext.ui.isCompact
+import com.pierbezuhoff.justtext.ui.isExpanded
+import com.pierbezuhoff.justtext.ui.isLandscape
 import com.pierbezuhoff.justtext.ui.theme.JustTextColors
 import ui.colorpicker.ClassicColorPicker
 import ui.colorpicker.HsvColor
@@ -109,6 +112,7 @@ fun ColorPickerDialog(
     currentColor: Color,
     onCancel: () -> Unit,
     onConfirm: (newColor: Color) -> Unit,
+    showAlphaBar: Boolean = true,
 ) {
     val colorState = rememberSaveable(currentColor, stateSaver = HsvColor.Saver) {
         mutableStateOf(HsvColor.from(currentColor))
@@ -184,6 +188,7 @@ fun ColorPickerDialog(
                             ColorPickerDisplay(
                                 colorState,
                                 Modifier.fillMaxHeight(0.8f),
+                                showAlphaBar = showAlphaBar,
                             )
                             Row(
                                 Modifier
@@ -275,6 +280,7 @@ fun ColorPickerDialog(
                         Modifier.fillMaxWidth(
                             if (isMedium) 0.6f else 0.8f
                         ),
+                        showAlphaBar = showAlphaBar,
                     )
                     Row() {
                         Box(
@@ -357,6 +363,7 @@ private fun computeHexTFV(color: Color): TextFieldValue {
 private fun ColorPickerDisplay(
     hsvColorState: MutableState<HsvColor>,
     modifier: Modifier = Modifier,
+    showAlphaBar: Boolean = true,
     onColorChanged: () -> Unit = {},
 ) {
     ClassicColorPicker(
@@ -365,7 +372,7 @@ private fun ColorPickerDisplay(
             .padding(16.dp)
         ,
         colorPickerValueState = hsvColorState,
-        showAlphaBar = true,
+        showAlphaBar = showAlphaBar,
         onColorChanged = { onColorChanged() }
     )
 }

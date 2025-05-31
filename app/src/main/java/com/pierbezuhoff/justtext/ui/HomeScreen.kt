@@ -18,6 +18,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -30,7 +33,12 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
+import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
+
+enum class DialogType {
+    COLORS,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +57,7 @@ fun HomeScreen(
     val initialText by viewModel.initialTextFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     val backgroundImageUri: Uri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
+    var openedDialogType: DialogType? by remember { mutableStateOf(null) }
     Box(
         Modifier
             .fillMaxSize()
@@ -90,12 +99,22 @@ fun HomeScreen(
                     actions = {
                         IconButton(
                             onClick = {
+                                openedDialogType = DialogType.COLORS
+                            }
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.palette),
+                                "choose ui colors"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
                                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },
                         ) {
                             Icon(
                                 painterResource(R.drawable.background_image),
-                                "choose bg"
+                                "choose bg image"
                             )
                         }
                     },
@@ -121,6 +140,31 @@ fun HomeScreen(
                 )
             }
         }
+    }
+    when (openedDialogType) {
+        DialogType.COLORS -> {
+            ColorsDialog(
+                textColor = Color(uiState.textColor),
+                textBackgroundColor = Color(uiState.textFieldBackgroundColor),
+                backgroundColor = Color(uiState.backgroundColor),
+                onNewTextColor = { color ->
+                    viewModel.setTextColor(color)
+                    openedDialogType = null
+                },
+                onNewTextBackgroundColor = { color ->
+                    viewModel.setTextBackgroundColor(color)
+                    openedDialogType = null
+                },
+                onNewBackgroundColor = { color ->
+                    viewModel.setBackgroundColor(color)
+                    openedDialogType = null
+                },
+                onDismiss = {
+                    openedDialogType = null
+                },
+            )
+        }
+        null -> {}
     }
     val defaultTextColor = MaterialTheme.colorScheme.primary
     val defaultTextFieldBackgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
