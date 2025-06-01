@@ -67,15 +67,15 @@ fun ColorsDialog(
                 ) {
                     Text("Change text color")
                 }
-                TextButton(
-                    onClick = {
-                        openedDialogType = ColorsDialogType.TEXT_BACKGROUND
-                    },
-                    modifier = buttonModifier,
-                    colors = buttonColors,
-                ) {
-                    Text("Change text background color")
-                }
+//                TextButton(
+//                    onClick = {
+//                        openedDialogType = ColorsDialogType.TEXT_BACKGROUND
+//                    },
+//                    modifier = buttonModifier,
+//                    colors = buttonColors,
+//                ) {
+//                    Text("Change text background color")
+//                }
                 TextButton(
                     onClick = {
                         openedDialogType = ColorsDialogType.IMAGE_BACKGROUND

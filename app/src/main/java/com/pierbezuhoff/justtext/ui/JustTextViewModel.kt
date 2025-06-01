@@ -52,7 +52,7 @@ class JustTextViewModel(
     private suspend fun loadDataStoreData() {
         dataStore.data.firstOrNull()?.let { data ->
             data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
-                println("loaded text color $color")
+                println("loaded bg color $color")
                 uiStateFlow.update { it.copy(imageBackgroundColor = color) }
             }
             data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
@@ -60,8 +60,8 @@ class JustTextViewModel(
                 uiStateFlow.update { it.copy(textBackgroundColor = color) }
             }
             data[TEXT_COLOR_KEY]?.toULong()?.let { color ->
-                println("loaded image bg color $color")
-                uiStateFlow.update { it.copy(imageBackgroundColor = color) }
+                println("loaded text color $color")
+                uiStateFlow.update { it.copy(textColor = color) }
             }
             data[CURSOR_LOCATION]?.let { cursorLocation ->
                 initialCursorLocationFlow.update { cursorLocation }

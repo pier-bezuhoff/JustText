@@ -2,10 +2,13 @@ package com.pierbezuhoff.justtext.ui
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,20 +26,28 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.launch
 
 // reference: https://issuetracker.google.com/issues/237190748#comment4
+/** [BasicTextField] wrapper that fixes scroll-cursor-into-view-on-ime-keyboard-open bug */
 @Composable
 fun PatchedBasicTextField(
     value: TextFieldValue,
     onValueChange: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
     textStyle: TextStyle = TextStyle.Default,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     minLines: Int = 1,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    interactionSource: MutableInteractionSource? = null,
     cursorBrush: Brush = SolidColor(Color.Black),
-    innerScrollState: ScrollState = rememberScrollState(),
+    scrollState: ScrollState = rememberScrollState(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     var height by remember { mutableIntStateOf(0) }
@@ -51,15 +62,15 @@ fun PatchedBasicTextField(
                     val cursorInView = value.isCursorInView(
                         layoutResult = layoutResult!!,
                         height = it.height.toFloat(),
-                        scrollValue = innerScrollState.value.toFloat()
+                        scrollValue = scrollState.value.toFloat()
                     )
                     if (!cursorInView && height > it.height) {
-                        innerScrollState.scrollBy(
+                        scrollState.scrollBy(
                             value.calculateRequiredSizeScroll(
                                 layoutResult = layoutResult!!,
                                 oldHeight = height.toFloat(),
                                 newHeight = it.height.toFloat(),
-                                scrollValue = innerScrollState.value.toFloat()
+                                scrollValue = scrollState.value.toFloat()
                             )
                         )
                     }
@@ -67,15 +78,21 @@ fun PatchedBasicTextField(
                 }
             }
         ,
+        enabled = enabled,
+        readOnly = readOnly,
         textStyle = textStyle,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         singleLine = singleLine,
         maxLines = maxLines,
         minLines = minLines,
+        visualTransformation = visualTransformation,
         onTextLayout = { layoutResult = it },
+        interactionSource = interactionSource,
         cursorBrush = cursorBrush,
-        decorationBox = {
-            Box(modifier = Modifier.verticalScroll(innerScrollState)) {
-                it()
+        decorationBox = { innerTextField ->
+            Box(modifier = Modifier.verticalScroll(scrollState)) {
+                innerTextField()
             }
         },
     )
@@ -83,14 +100,14 @@ fun PatchedBasicTextField(
         val cursorInView = value.isCursorInView(
             layoutResult = layoutResult!!,
             height = height.toFloat(),
-            scrollValue = innerScrollState.value.toFloat()
+            scrollValue = scrollState.value.toFloat()
         )
         if (!cursorInView) {
-            innerScrollState.scrollBy(
+            scrollState.scrollBy(
                 value.calculateRequiredSelectionScroll(
                     layoutResult = layoutResult!!,
                     height = height.toFloat(),
-                    scrollValue = innerScrollState.value.toFloat()
+                    scrollValue = scrollState.value.toFloat()
                 )
             )
         }
