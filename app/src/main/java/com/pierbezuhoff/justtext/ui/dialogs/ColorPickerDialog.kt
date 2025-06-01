@@ -497,6 +497,7 @@ fun DialogTitle(
     Text(
         text = stringResource(titleStringResource),
         modifier = modifier.padding(16.dp),
+        color = MaterialTheme.colorScheme.primary,
         style =
             if (smallerFont) MaterialTheme.typography.titleMedium
             else MaterialTheme.typography.titleLarge,

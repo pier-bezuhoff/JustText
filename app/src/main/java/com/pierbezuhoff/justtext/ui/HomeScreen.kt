@@ -5,8 +5,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContentPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -16,7 +25,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,14 +63,19 @@ fun HomeScreen(
         }
     }
     val initialText by viewModel.initialTextFlow.collectAsStateWithLifecycle()
+    val initialCursorLocation by viewModel.initialCursorLocationFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     val backgroundImageUri: Uri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
+    val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
+    val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+    val imageBackgroundColor = uiState.imageBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.surface
     Box(
-        Modifier
-            .fillMaxSize()
+        modifier
             .drawBehind {
-                drawRect(Color(uiState.backgroundColor))
+                drawRect(
+                    uiState.imageBackgroundColor?.let { Color(it) } ?: imageBackgroundColor
+                )
             }
     ) {
         backgroundImageUri?.let { uri ->
@@ -79,7 +92,8 @@ fun HomeScreen(
             )
         }
         Scaffold(
-            modifier = modifier.fillMaxSize(),
+            modifier = Modifier
+            ,
             topBar = {
                 TopAppBar(
                     navigationIcon = {
@@ -127,16 +141,26 @@ fun HomeScreen(
             },
             containerColor = Color.Transparent,
         ) { innerPadding ->
+            innerPadding
             Surface(
-                modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                modifier = Modifier
+                    // see: https://stackoverflow.com/a/77354483/7143065
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding)
+                    .safeDrawingPadding()
+//                    .safeContentPadding()
+//                    .imePadding()
+//                    .fillMaxSize()
+                ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
                 TextScreen(
                     initialText = initialText,
-                    textColor = Color(uiState.textColor),
-                    textFieldBackgroundColor = Color(uiState.textFieldBackgroundColor),
-                    onNewText = viewModel::updateText,
-                    modifier = modifier
+                    initialCursorLocation = initialCursorLocation,
+                    textColor = textColor,
+                    textBackgroundColor = textBackgroundColor,
+                    onNewText = viewModel::setText,
+                    onNewCursorLocation = viewModel::setCursorLocation,
                 )
             }
         }
@@ -144,19 +168,19 @@ fun HomeScreen(
     when (openedDialogType) {
         DialogType.COLORS -> {
             ColorsDialog(
-                textColor = Color(uiState.textColor),
-                textBackgroundColor = Color(uiState.textFieldBackgroundColor),
-                backgroundColor = Color(uiState.backgroundColor),
-                onNewTextColor = { color ->
+                textColor = textColor,
+                textBackgroundColor = textBackgroundColor,
+                imageBackgroundColor = imageBackgroundColor,
+                setTextColor = { color ->
                     viewModel.setTextColor(color)
                     openedDialogType = null
                 },
-                onNewTextBackgroundColor = { color ->
+                setTextBackgroundColor = { color ->
                     viewModel.setTextBackgroundColor(color)
                     openedDialogType = null
                 },
-                onNewBackgroundColor = { color ->
-                    viewModel.setBackgroundColor(color)
+                setImageBackgroundColor = { color ->
+                    viewModel.setImageBackgroundColor(color)
                     openedDialogType = null
                 },
                 onDismiss = {
@@ -166,20 +190,12 @@ fun HomeScreen(
         }
         null -> {}
     }
-    val defaultTextColor = MaterialTheme.colorScheme.primary
-    val defaultTextFieldBackgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-    val defaultBackgroundColor = MaterialTheme.colorScheme.surface
-    LaunchedEffect(viewModel, defaultTextColor, defaultTextFieldBackgroundColor, defaultBackgroundColor) {
-        viewModel.setDefaultColors(
-            defaultTextColor, defaultTextFieldBackgroundColor, defaultBackgroundColor,
-        )
-    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
     JustTextTheme {
-//        TextScreen("hi!!!!!", {})
+        TextScreen("hi!!!!!", 0, Color.Black, Color.LightGray, {}, {})
     }
 }

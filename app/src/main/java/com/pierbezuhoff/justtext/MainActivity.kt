@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: JustTextViewModel by viewModels { JustTextViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {

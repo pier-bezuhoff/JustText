@@ -6,7 +6,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,8 +15,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -27,11 +27,9 @@ class JustTextViewModel(
 ) : ViewModel() {
     val uiStateFlow = MutableStateFlow(UiState(
         text = ".",
-        textColor = Color.White.value,
-        textFieldBackgroundColor = Color.DarkGray.copy(alpha = 0.4f).value,
-        backgroundColor = Color.Black.value,
     ))
-    val initialTextFlow = MutableStateFlow("...")
+    val initialTextFlow = MutableStateFlow<String>("...")
+    val initialCursorLocationFlow = MutableStateFlow<Int>(0)
     private val backgroundImageFile = File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
     val backgroundImageUri = MutableStateFlow<Uri?>(null)
 
@@ -39,6 +37,7 @@ class JustTextViewModel(
         viewModelScope.launch {
             loadInitialTextFromFile()
             loadBackgroundImageFromFile()
+            loadDataStoreData()
         }
     }
 
@@ -46,18 +45,28 @@ class JustTextViewModel(
         applicationContext.openFileInput(SAVED_TEXT_FILENAME).bufferedReader().useLines { lines ->
             val text = lines.joinToString("\n")
             initialTextFlow.update { text }
-            updateText(text)
-            println("text loaded")
+            setText(text)
         }
     }
 
-    private suspend fun loadInitialTextFromDataStore() {
-        val dataStoredText = dataStore.data.map { it[TEXT_KEY] }.first()
-        if (dataStoredText != null) {
-            initialTextFlow.update { dataStoredText }
-            updateText(dataStoredText)
-        } else {
-            println("no stored text found")
+    private suspend fun loadDataStoreData() {
+        dataStore.data.firstOrNull()?.let { data ->
+            data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
+                println("loaded text color $color")
+                uiStateFlow.update { it.copy(imageBackgroundColor = color) }
+            }
+            data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
+                println("loaded text bg color $color")
+                uiStateFlow.update { it.copy(textBackgroundColor = color) }
+            }
+            data[TEXT_COLOR_KEY]?.toULong()?.let { color ->
+                println("loaded image bg color $color")
+                uiStateFlow.update { it.copy(imageBackgroundColor = color) }
+            }
+            data[CURSOR_LOCATION]?.let { cursorLocation ->
+                initialCursorLocationFlow.update { cursorLocation }
+                uiStateFlow.update { it.copy(cursorLocation = cursorLocation) }
+            }
         }
     }
 
@@ -67,56 +76,59 @@ class JustTextViewModel(
         }
     }
 
-    fun setDefaultColors(
-        textColor: Color,
-        textFieldBackgroundColor: Color,
-        backgroundColor: Color,
-    ) {
+    fun setCursorLocation(cursorLocation: Int) {
         uiStateFlow.update {
-            it.copy(
-                textColor = textColor.value,
-                textFieldBackgroundColor = textFieldBackgroundColor.value,
-                backgroundColor = backgroundColor.value,
-            )
+            it.copy(cursorLocation = cursorLocation)
         }
     }
 
-    fun setTextColor(textColor: Color) {
+    fun setTextColor(color: Color) {
         uiStateFlow.update {
-            it.copy(
-                textColor = textColor.value,
-            )
+            it.copy(textColor = color.value)
         }
     }
 
-    fun setTextBackgroundColor(textFieldBackgroundColor: Color) {
+    fun setTextBackgroundColor(color: Color) {
         uiStateFlow.update {
-            it.copy(
-                textFieldBackgroundColor = textFieldBackgroundColor.value,
-            )
+            it.copy(textBackgroundColor = color.value)
         }
     }
 
-    fun setBackgroundColor(backgroundColor: Color) {
+    fun setImageBackgroundColor(color: Color) {
         uiStateFlow.update {
-            it.copy(
-                backgroundColor = backgroundColor.value,
-            )
+            it.copy(imageBackgroundColor = color.value)
         }
     }
 
-    fun updateText(newText: String) {
-        uiStateFlow.update { it.copy(text = newText) }
+    fun setText(text: String) {
+        uiStateFlow.update { it.copy(text = text) }
     }
 
     fun persistState() {
         saveTextToFile()
+        saveDatastoreData()
     }
 
-    fun saveTextToDatastore() {
+    fun saveDatastoreData() {
         runBlocking {
+            val uiState = uiStateFlow.value
             dataStore.edit { preferences ->
-                preferences[TEXT_KEY] = uiStateFlow.value.text
+                uiState.textColor?.let { color ->
+                    preferences[TEXT_COLOR_KEY] = color.toLong()
+                    println("saved tc $color")
+                }
+                uiState.textBackgroundColor?.let { color ->
+                    preferences[TEXT_BACKGROUND_COLOR_KEY] = color.toLong()
+                    println("saved tbc $color")
+                }
+                uiState.imageBackgroundColor?.let { color ->
+                    preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
+                    println("saved ibc $color")
+                }
+                uiState.cursorLocation.let { cursorLocation ->
+                    preferences[CURSOR_LOCATION] = cursorLocation
+                    println("saved cl $cursorLocation")
+                }
             }
         }
     }
@@ -165,7 +177,11 @@ class JustTextViewModel(
             }
         }
 
-        private val TEXT_KEY = stringPreferencesKey("text")
+//        private val TEXT_KEY = stringPreferencesKey("text")
+        private val CURSOR_LOCATION = intPreferencesKey("cursor_location")
+        private val TEXT_COLOR_KEY = longPreferencesKey("text_color")
+        private val TEXT_BACKGROUND_COLOR_KEY = longPreferencesKey("text_background_color")
+        private val IMAGE_BACKGROUND_COLOR_KEY = longPreferencesKey("image_background_color")
         private const val SAVED_TEXT_FILENAME = "saved-text.txt"
         private const val BACKGROUND_IMAGE_FILENAME = "background-image.jpg"
     }

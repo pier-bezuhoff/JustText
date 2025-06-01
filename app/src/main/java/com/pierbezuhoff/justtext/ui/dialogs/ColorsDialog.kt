@@ -1,6 +1,5 @@
 package com.pierbezuhoff.justtext.ui.dialogs
 
-import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,17 +23,17 @@ import androidx.compose.ui.window.Dialog
 private enum class ColorsDialogType {
     TEXT,
     TEXT_BACKGROUND,
-    BACKGROUND,
+    IMAGE_BACKGROUND,
 }
 
 @Composable
 fun ColorsDialog(
     textColor: Color,
     textBackgroundColor: Color,
-    backgroundColor: Color,
-    onNewTextColor: (Color) -> Unit,
-    onNewTextBackgroundColor: (Color) -> Unit,
-    onNewBackgroundColor: (Color) -> Unit,
+    imageBackgroundColor: Color,
+    setTextColor: (Color) -> Unit,
+    setTextBackgroundColor: (Color) -> Unit,
+    setImageBackgroundColor: (Color) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -79,12 +78,12 @@ fun ColorsDialog(
                 }
                 TextButton(
                     onClick = {
-                        openedDialogType = ColorsDialogType.BACKGROUND
+                        openedDialogType = ColorsDialogType.IMAGE_BACKGROUND
                     },
                     modifier = buttonModifier,
                     colors = buttonColors,
                 ) {
-                    Text("Change background color")
+                    Text("Change image background color")
                 }
             }
         }
@@ -98,7 +97,7 @@ fun ColorsDialog(
                 },
                 onConfirm = { color ->
                     openedDialogType = null
-                    onNewTextColor(color)
+                    setTextColor(color)
                 },
                 showAlphaBar = false,
             )
@@ -111,20 +110,20 @@ fun ColorsDialog(
                 },
                 onConfirm = { color ->
                     openedDialogType = null
-                    onNewTextBackgroundColor(color)
+                    setTextBackgroundColor(color)
                 },
                 showAlphaBar = true,
             )
         }
-        ColorsDialogType.BACKGROUND -> {
+        ColorsDialogType.IMAGE_BACKGROUND -> {
             ColorPickerDialog(
-                backgroundColor,
+                imageBackgroundColor,
                 onCancel = {
                     openedDialogType = null
                 },
                 onConfirm = { color ->
                     openedDialogType = null
-                    onNewBackgroundColor(color)
+                    setImageBackgroundColor(color)
                 },
                 showAlphaBar = false,
             )
