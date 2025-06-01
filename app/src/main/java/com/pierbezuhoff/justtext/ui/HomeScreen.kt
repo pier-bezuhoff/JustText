@@ -5,17 +5,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -144,13 +137,9 @@ fun HomeScreen(
             innerPadding
             Surface(
                 modifier = Modifier
-                    // see: https://stackoverflow.com/a/77354483/7143065
                     .padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
                     .safeDrawingPadding()
-//                    .safeContentPadding()
-//                    .imePadding()
-//                    .fillMaxSize()
                 ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {

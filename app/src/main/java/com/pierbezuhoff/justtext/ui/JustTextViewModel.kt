@@ -52,15 +52,12 @@ class JustTextViewModel(
     private suspend fun loadDataStoreData() {
         dataStore.data.firstOrNull()?.let { data ->
             data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
-                println("loaded bg color $color")
                 uiStateFlow.update { it.copy(imageBackgroundColor = color) }
             }
             data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
-                println("loaded text bg color $color")
                 uiStateFlow.update { it.copy(textBackgroundColor = color) }
             }
             data[TEXT_COLOR_KEY]?.toULong()?.let { color ->
-                println("loaded text color $color")
                 uiStateFlow.update { it.copy(textColor = color) }
             }
             data[CURSOR_LOCATION]?.let { cursorLocation ->
@@ -115,19 +112,15 @@ class JustTextViewModel(
             dataStore.edit { preferences ->
                 uiState.textColor?.let { color ->
                     preferences[TEXT_COLOR_KEY] = color.toLong()
-                    println("saved tc $color")
                 }
                 uiState.textBackgroundColor?.let { color ->
                     preferences[TEXT_BACKGROUND_COLOR_KEY] = color.toLong()
-                    println("saved tbc $color")
                 }
                 uiState.imageBackgroundColor?.let { color ->
                     preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
-                    println("saved ibc $color")
                 }
                 uiState.cursorLocation.let { cursorLocation ->
                     preferences[CURSOR_LOCATION] = cursorLocation
-                    println("saved cl $cursorLocation")
                 }
             }
         }
@@ -139,7 +132,7 @@ class JustTextViewModel(
             applicationContext.openFileOutput(SAVED_TEXT_FILENAME, Context.MODE_PRIVATE).use {
                 it.write(text.toByteArray())
             }
-            println("text saved")
+            println("text saved (${text.length} characters)")
         } catch (e: Exception) {
             e.printStackTrace()
         }

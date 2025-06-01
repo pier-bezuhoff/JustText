@@ -26,7 +26,7 @@ fun TextScreen(
     var tfValue by remember(initialText, initialCursorLocation) { mutableStateOf(
         TextFieldValue(initialText, selection = TextRange(initialCursorLocation))
     ) }
-    val tfStyle = MaterialTheme.typography.bodyLarge.copy(
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = textColor,
         lineBreak = LineBreak.Paragraph,
     )
@@ -38,7 +38,7 @@ fun TextScreen(
             onNewCursorLocation(it.selection.start)
         },
         modifier = modifier,
-        textStyle = tfStyle,
+        textStyle = textStyle,
         minLines = 70,
         maxLines = Int.MAX_VALUE,
         cursorBrush = SolidColor(textColor),
