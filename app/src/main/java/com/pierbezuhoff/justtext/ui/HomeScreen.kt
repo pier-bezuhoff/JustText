@@ -50,7 +50,7 @@ fun HomeScreen(
 ) {
     val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
-            viewModel.loadNewBackgroundImage(uri)
+            viewModel.setBackgroundImage(uri)
         } else {
             println("PhotoPicker: No media selected")
         }

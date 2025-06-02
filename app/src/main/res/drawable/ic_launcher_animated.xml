@@ -20,12 +20,13 @@
               android:type="linear"
           >
             <item android:offset="0.12" android:color="#FF4FC3F7"/>
-            <item android:offset="1" android:color="#FFFFFFFF"/>
+            <item android:offset="0.5" android:color="#FFFFFFFF"/>
           </gradient>
         </aapt:attr>
       </path>
       <path
-          android:pathData="m76.56,21v66"
+          android:name="cursor"
+          android:pathData="m76.56,23v62"
           android:strokeWidth="3"
           android:fillColor="#00000000"
           android:strokeColor="#003587"
@@ -37,4 +38,18 @@
       />
     </vector>
   </aapt:attr>
+
+  <!-- TEST: my old device dont display it -->
+  <target android:name="cursor">
+    <aapt:attr name="android:animation">
+      <objectAnimator
+          android:propertyName="alpha"
+          android:valueFrom="1.0"
+          android:valueTo="0.0"
+          android:duration="500"
+          android:repeatCount="-1"
+          android:repeatMode="reverse"
+      />
+    </aapt:attr>
+  </target>
 </animated-vector>

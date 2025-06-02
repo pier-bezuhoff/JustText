@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.pierbezuhoff.justtext.ui.HomeScreen
 import com.pierbezuhoff.justtext.ui.JustTextViewModel
+import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "save")
@@ -25,10 +26,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JustTextTheme() {
+            JustTextTheme(colorTheme = ColorTheme.Auto) {
                 HomeScreen(
                     viewModel = viewModel,
-                    quitApp = { finishAndRemoveTask() },
+                    quitApp = {
+                        // BUG: sometimes bg image is not saved when we quit this way
+                        finishAndRemoveTask()
+                    },
                 )
             }
         }

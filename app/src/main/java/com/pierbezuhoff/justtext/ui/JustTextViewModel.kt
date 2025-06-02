@@ -26,27 +26,31 @@ class JustTextViewModel(
     private val dataStore: DataStore<Preferences>,
 ) : ViewModel() {
     val uiStateFlow = MutableStateFlow(UiState(
-        text = ".",
+        text = "hello",
     ))
-    val initialTextFlow = MutableStateFlow<String>("...")
+    val initialTextFlow = MutableStateFlow<String>("Welcome!")
     val initialCursorLocationFlow = MutableStateFlow<Int>(0)
-    private val backgroundImageFile = File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
     val backgroundImageUri = MutableStateFlow<Uri?>(null)
+    private val backgroundImageFile =
+        File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
 
     init {
         viewModelScope.launch {
             loadInitialTextFromFile()
             loadBackgroundImageFromFile()
             loadDataStoreData()
+            println("ViewModel loaded persistent data")
         }
     }
 
     private fun loadInitialTextFromFile() {
-        applicationContext.openFileInput(SAVED_TEXT_FILENAME).bufferedReader().useLines { lines ->
-            val text = lines.joinToString("\n")
-            initialTextFlow.update { text }
-            setText(text)
-        }
+        applicationContext.openFileInput(SAVED_TEXT_FILENAME)
+            .bufferedReader()
+            .useLines { lines ->
+                val text = lines.joinToString("\n")
+                initialTextFlow.update { text }
+                setText(text)
+            }
     }
 
     private suspend fun loadDataStoreData() {
@@ -101,6 +105,25 @@ class JustTextViewModel(
         uiStateFlow.update { it.copy(text = text) }
     }
 
+    fun setBackgroundImage(uri: Uri) {
+        backgroundImageUri.value = uri
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                applicationContext.contentResolver.openInputStream(uri)?.use { input ->
+                    backgroundImageFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                    println("finished copying new bg image $uri")
+                } ?: run {
+                    println("cannot copy new bg image")
+                }
+            } catch (e: Exception) {
+                println("failed to copy new bg image")
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun persistState() {
         saveTextToFile()
         saveDatastoreData()
@@ -135,21 +158,6 @@ class JustTextViewModel(
             println("text saved (${text.length} characters)")
         } catch (e: Exception) {
             e.printStackTrace()
-        }
-    }
-
-    fun loadNewBackgroundImage(uri: Uri) {
-        backgroundImageUri.value = uri
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                applicationContext.contentResolver.openInputStream(uri)?.use { input ->
-                    backgroundImageFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
         }
     }
 
