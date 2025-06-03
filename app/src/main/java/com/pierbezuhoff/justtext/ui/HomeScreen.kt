@@ -1,6 +1,5 @@
 package com.pierbezuhoff.justtext.ui
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,7 +63,7 @@ fun HomeScreen(
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
     val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
-    val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+    val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
     val imageBackgroundColor = uiState.imageBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.surface
     Box(
         modifier
@@ -141,7 +140,6 @@ fun HomeScreen(
             },
             containerColor = Color.Transparent,
         ) { innerPadding ->
-            innerPadding
             Surface(
                 modifier = Modifier
                     .padding(innerPadding)

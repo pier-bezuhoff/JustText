@@ -9,13 +9,12 @@ import androidx.compose.ui.graphics.Color
 // -------   light-L  dark-L
 // primary     40       80
 // on-prim    100       20
-// pri-cont    90       30
-// on-pri-c    10       90
-// inv-prim    80       40
-private val primaryLight = Color(0xFF_003587)
+// pri-cont    90       90
+// on-pri-c    10       30
+private val primaryLight = Color(0xFF_1a4cab)
 private val onPrimaryLight = Color(0xFF_ffffff)
-private val primaryContainerLight = Color(0xFF_1a4cab)
-private val onPrimaryContainerLight = Color(0xFF_afc4ff)
+private val primaryContainerLight = Color(0xFF_003587)
+private val onPrimaryContainerLight = Color(0xFF_afc4ff) // low contrast
 private val secondaryLight = Color(0xFF_4FC3F7)
 private val onSecondaryLight = Color(0xFF_01579B)
 private val secondaryContainerLight = Color(0xFF_0277BD)
@@ -27,8 +26,8 @@ private val primaryContainerDark = Color(0xFF_1a4cab)
 private val onPrimaryContainerDark = Color(0xFF_afc4ff)
 private val secondaryDark = Color(0xFF_0288D1)
 private val onSecondaryDark = Color(0xFF_B3E5FC)
-private val secondaryContainerDark = Color(0xFF_B3E5FC)
-private val onSecondaryContainerDark = Color(0xFF_01579B)
+private val secondaryContainerDark = Color(0xFF_01579B)
+private val onSecondaryContainerDark = Color(0xFF_B3E5FC)
 
 internal val LightScheme = lightColorScheme(
     primary = primaryLight,
@@ -52,15 +51,6 @@ internal val DarkScheme = darkColorScheme(
     onSecondaryContainer = onSecondaryContainerDark,
 )
 
-// old palette
-private val Purple80 = Color(0xFFD0BCFF)
-private val PurpleGrey80 = Color(0xFFCCC2DC)
-private val Pink80 = Color(0xFFEFB8C8)
-
-private val Purple40 = Color(0xFF6650a4)
-private val PurpleGrey40 = Color(0xFF625b71)
-private val Pink40 = Color(0xFF7D5260)
-
 object JustTextColors {
     val peachyPink = Color(0xFF_FFC0CB)
     val pinkishRed = Color(0xFF_FF7373)
@@ -74,15 +64,4 @@ object JustTextColors {
     val teal = Color(0xFF_008080)
     val darkPurple = Color(0xFF_6A2C70)
     val skyBlue = Color(0xff_2ca3ff)
-
-
-
-    val b = Color(0xFF_36618e)
-    val g = Color(0xFF_4c662b)
-    val t = Color(0xFF_6b5f10)
-//    val c = Color(0xFF_)
-
-    val CyanBlue = Color(0xFF_2196f3) // dark primary
-    val Lime = Color(0xFF_b6fa64) // dark secondary
-    val Yellow = Color(0xFF_fae466) // dark tertiary
 }

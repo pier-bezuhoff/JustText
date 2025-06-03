@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.pierbezuhoff.justtext"
-        minSdk = 24
+        minSdk = 24 // Android 7.0
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
