@@ -19,6 +19,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,9 +32,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
+import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
@@ -58,7 +61,7 @@ fun HomeScreen(
     val initialText by viewModel.initialTextFlow.collectAsStateWithLifecycle()
     val initialCursorLocation by viewModel.initialCursorLocationFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
-    val backgroundImageUri: Uri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
+    val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
     val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -71,18 +74,22 @@ fun HomeScreen(
                 )
             }
     ) {
-        backgroundImageUri?.let { uri ->
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(uri)
-                    .crossfade(500)
-                    .build()
-                ,
-                contentDescription = "background",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-                alpha = 1f,
-            )
+        backgroundImageUri?.let { taggedUri ->
+            key(taggedUri) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(taggedUri.uri)
+                        .memoryCachePolicy(CachePolicy.DISABLED)
+                        .diskCachePolicy(CachePolicy.DISABLED)
+                        .crossfade(500)
+                        .build()
+                    ,
+                    contentDescription = "background",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                    alpha = 1f,
+                )
+            }
         }
         Scaffold(
             modifier = Modifier

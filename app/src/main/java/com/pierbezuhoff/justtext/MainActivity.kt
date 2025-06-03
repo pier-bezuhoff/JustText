@@ -30,7 +30,6 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(
                     viewModel = viewModel,
                     quitApp = {
-                        // BUG: often bg image is not saved when we quit this way
                         finishAndRemoveTask()
                     },
                 )

@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,7 @@ class JustTextViewModel(
     ))
     val initialTextFlow = MutableStateFlow<String>("Welcome!")
     val initialCursorLocationFlow = MutableStateFlow<Int>(0)
-    val backgroundImageUri = MutableStateFlow<Uri?>(null)
+    val backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
     private val backgroundImageFile =
         File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
 
@@ -73,9 +74,14 @@ class JustTextViewModel(
 
     private fun loadBackgroundImageFromFile() {
         if (backgroundImageFile.exists()) {
-            backgroundImageUri.value = Uri.fromFile(backgroundImageFile)
+            backgroundImageUri.update { getTaggedUri() }
         }
     }
+
+    private fun getTaggedUri(): TaggedUri =
+        TaggedUri(
+            Uri.fromFile(backgroundImageFile)
+        )
 
     fun setCursorLocation(cursorLocation: Int) {
         uiStateFlow.update {
@@ -106,17 +112,16 @@ class JustTextViewModel(
     }
 
     fun setBackgroundImage(uri: Uri) {
-        backgroundImageUri.value = uri
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 applicationContext.contentResolver.openInputStream(uri)?.use { input ->
                     backgroundImageFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
-                    println("finished copying new bg image $uri")
-                } ?: run {
-                    println("cannot copy new bg image")
-                }
+                    val newTaggedUri = getTaggedUri()
+                    println("finished copying new bg image $uri -> $newTaggedUri")
+                    backgroundImageUri.update { newTaggedUri }
+                } ?: println("cannot copy new bg image")
             } catch (e: Exception) {
                 println("failed to copy new bg image")
                 e.printStackTrace()

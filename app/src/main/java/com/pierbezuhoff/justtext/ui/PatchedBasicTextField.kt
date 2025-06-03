@@ -1,6 +1,7 @@
 package com.pierbezuhoff.justtext.ui
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextLayoutResult
@@ -47,6 +51,8 @@ fun PatchedBasicTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     interactionSource: MutableInteractionSource? = null,
     cursorBrush: Brush = SolidColor(Color.Black),
+    containerColor: Color = Color.Transparent,
+    shape: Shape = RectangleShape,
     scrollState: ScrollState = rememberScrollState(),
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -91,7 +97,10 @@ fun PatchedBasicTextField(
         interactionSource = interactionSource,
         cursorBrush = cursorBrush,
         decorationBox = { innerTextField ->
-            Box(modifier = Modifier.verticalScroll(scrollState)) {
+            Box(modifier = Modifier
+                .background(containerColor, shape)
+                .verticalScroll(scrollState)
+            ) {
                 innerTextField()
             }
         },
