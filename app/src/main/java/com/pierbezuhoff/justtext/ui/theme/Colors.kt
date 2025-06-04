@@ -16,7 +16,7 @@ private val onPrimaryLight = Color(0xFF_ffffff)
 private val primaryContainerLight = Color(0xFF_003587)
 private val onPrimaryContainerLight = Color(0xFF_afc4ff) // low contrast
 private val secondaryLight = Color(0xFF_4FC3F7)
-private val onSecondaryLight = Color(0xFF_01579B)
+private val onSecondaryLight = Color(0xFF_01579B) // low contrast
 private val secondaryContainerLight = Color(0xFF_0277BD)
 private val onSecondaryContainerLight = Color(0xFF_E1F5FE)
 

@@ -36,6 +36,10 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        // otherwise linter crashes during signed release build...
+        disable += "NullSafeMutableLiveData"
+    }
 }
 
 dependencies {

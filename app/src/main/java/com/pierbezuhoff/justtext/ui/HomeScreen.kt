@@ -74,10 +74,12 @@ fun HomeScreen(
             }
     ) {
         backgroundImageUri?.let { taggedUri ->
-            key(taggedUri) {
+            key(taggedUri) { // essential
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(taggedUri.uri)
+                        // since we have always the same uri, but diff content
+                        // caching is a no-go
                         .memoryCachePolicy(CachePolicy.DISABLED)
                         .diskCachePolicy(CachePolicy.DISABLED)
                         .crossfade(500)
