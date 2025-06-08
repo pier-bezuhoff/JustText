@@ -51,7 +51,6 @@ fun FontSizeDialog(
                     R.string.font_size_title,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                // label + slider
                 Slider(
                     value = fontSizeState.floatValue,
                     onValueChange = { fontSizeState.floatValue = it },

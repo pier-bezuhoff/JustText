@@ -3,7 +3,6 @@ package com.pierbezuhoff.justtext.ui
 import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.fontResource
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -16,12 +15,21 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.time.Duration.Companion.minutes
 
 class JustTextViewModel(
     private val applicationContext: Context,
@@ -36,12 +44,16 @@ class JustTextViewModel(
     private val backgroundImageFile =
         File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
 
+    private val periodicSaveIsOn = MutableStateFlow(false)
+    private var periodicSaveJob: Job? = null
+
     init {
         viewModelScope.launch {
             loadInitialTextFromFile()
             loadBackgroundImageFromFile()
             loadDataStoreData()
             println("ViewModel loaded persistent data")
+            startPeriodicSave()
         }
     }
 
@@ -80,6 +92,34 @@ class JustTextViewModel(
         if (backgroundImageFile.exists()) {
             backgroundImageUri.update { getTaggedUri() }
         }
+    }
+
+    private fun startPeriodicSave() {
+        if (!periodicSaveIsOn.value) {
+            periodicSaveIsOn.update { true }
+            periodicSaveJob = viewModelScope.launch {
+                flow {
+                    while (true) {
+                        emit(Unit)
+                        delay(PERIODIC_SAVE_DELAY)
+                    }
+                }
+                    .flowOn(Dispatchers.Default)
+                    .catch { e -> e.printStackTrace() }
+                    .collect {
+                        println("periodic save")
+                        saveDatastoreData()
+                        withContext(Dispatchers.IO) {
+                            saveTextToFile()
+                        }
+                    }
+            }
+        }
+    }
+
+    fun stopPeriodicSave() {
+        periodicSaveJob?.cancel()
+        periodicSaveIsOn.update { false }
     }
 
     private fun getTaggedUri(): TaggedUri =
@@ -179,6 +219,11 @@ class JustTextViewModel(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        stopPeriodicSave()
+    }
+
     companion object {
         // reference: https://developer.android.com/topic/libraries/architecture/viewmodel/viewmodel-factories
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -195,6 +240,8 @@ class JustTextViewModel(
                 ) as T
             }
         }
+
+        private val PERIODIC_SAVE_DELAY = 3.minutes
 
 //        private val TEXT_KEY = stringPreferencesKey("text")
         private val CURSOR_LOCATION = intPreferencesKey("cursor_location")
