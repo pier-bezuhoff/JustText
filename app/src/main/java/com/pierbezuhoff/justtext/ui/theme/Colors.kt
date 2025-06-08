@@ -22,11 +22,11 @@ private val onSecondaryContainerLight = Color(0xFF_E1F5FE)
 
 private val primaryDark = Color(0xFF_b2c5ff)
 private val onPrimaryDark = Color(0xFF_002c72)
-private val primaryContainerDark = Color(0xFF_1a4cab)
+private val primaryContainerDark = Color(0xFF_1a4cab) // too bright
 private val onPrimaryContainerDark = Color(0xFF_afc4ff)
 private val secondaryDark = Color(0xFF_0288D1)
 private val onSecondaryDark = Color(0xFF_B3E5FC)
-private val secondaryContainerDark = Color(0xFF_01579B)
+private val secondaryContainerDark = Color(0xFF_01579B) // too bright
 private val onSecondaryContainerDark = Color(0xFF_B3E5FC)
 
 internal val LightScheme = lightColorScheme(

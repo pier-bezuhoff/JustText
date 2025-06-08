@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
@@ -37,9 +38,11 @@ import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
+import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 enum class DialogType {
+    FONT_SIZE,
     COLORS,
 }
 
@@ -114,6 +117,16 @@ fun HomeScreen(
                     actions = {
                         IconButton(
                             onClick = {
+                                openedDialogType = DialogType.FONT_SIZE
+                            }
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.text_size),
+                                "choose font size"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
                                 openedDialogType = DialogType.COLORS
                             }
                         ) {
@@ -153,6 +166,7 @@ fun HomeScreen(
                 TextScreen(
                     initialText = initialText,
                     initialCursorLocation = initialCursorLocation,
+                    fontSize = uiState.fontSize,
                     textColor = textColor,
                     textBackgroundColor = textBackgroundColor,
                     onNewText = viewModel::setText,
@@ -162,6 +176,18 @@ fun HomeScreen(
         }
     }
     when (openedDialogType) {
+        DialogType.FONT_SIZE -> {
+            FontSizeDialog(
+                fontSize = uiState.fontSize,
+                setFontSize = { fontSize ->
+                    viewModel.setFontSize(fontSize)
+                    openedDialogType = null
+                },
+                onCancel = {
+                    openedDialogType = null
+                }
+            )
+        }
         DialogType.COLORS -> {
             ColorsDialog(
                 textColor = textColor,
@@ -192,6 +218,6 @@ fun HomeScreen(
 @Composable
 fun HomeScreenPreview() {
     JustTextTheme {
-        TextScreen("hi!!!!!", 0, Color.Black, Color.LightGray, {}, {})
+        TextScreen("hi!!!!!", 0, 30, Color.Black, Color.LightGray, {}, {})
     }
 }

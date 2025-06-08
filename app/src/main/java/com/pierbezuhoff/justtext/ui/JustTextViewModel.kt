@@ -3,6 +3,7 @@ package com.pierbezuhoff.justtext.ui
 import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.fontResource
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -69,6 +70,9 @@ class JustTextViewModel(
                 initialCursorLocationFlow.update { cursorLocation }
                 uiStateFlow.update { it.copy(cursorLocation = cursorLocation) }
             }
+            data[FONT_SIZE]?.let { fontSize ->
+                uiStateFlow.update { it.copy(fontSize = fontSize) }
+            }
         }
     }
 
@@ -86,6 +90,12 @@ class JustTextViewModel(
     fun setCursorLocation(cursorLocation: Int) {
         uiStateFlow.update {
             it.copy(cursorLocation = cursorLocation)
+        }
+    }
+
+    fun setFontSize(fontSize: Int) {
+        uiStateFlow.update {
+            it.copy(fontSize = fontSize)
         }
     }
 
@@ -150,6 +160,9 @@ class JustTextViewModel(
                 uiState.cursorLocation.let { cursorLocation ->
                     preferences[CURSOR_LOCATION] = cursorLocation
                 }
+                uiState.fontSize.let { fontSize ->
+                    preferences[FONT_SIZE] = fontSize
+                }
             }
         }
     }
@@ -185,6 +198,7 @@ class JustTextViewModel(
 
 //        private val TEXT_KEY = stringPreferencesKey("text")
         private val CURSOR_LOCATION = intPreferencesKey("cursor_location")
+        private val FONT_SIZE = intPreferencesKey("font_size")
         private val TEXT_COLOR_KEY = longPreferencesKey("text_color")
         private val TEXT_BACKGROUND_COLOR_KEY = longPreferencesKey("text_background_color")
         private val IMAGE_BACKGROUND_COLOR_KEY = longPreferencesKey("image_background_color")

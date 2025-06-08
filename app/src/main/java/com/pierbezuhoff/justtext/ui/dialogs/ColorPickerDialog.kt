@@ -75,6 +75,10 @@ import androidx.window.core.layout.WindowWidthSizeClass
 import com.github.ajalt.colormath.RenderCondition
 import com.github.ajalt.colormath.model.RGB
 import com.pierbezuhoff.justtext.R
+import com.pierbezuhoff.justtext.ui.CancelButton
+import com.pierbezuhoff.justtext.ui.DialogTitle
+import com.pierbezuhoff.justtext.ui.OkButton
+import com.pierbezuhoff.justtext.ui.SimpleButton
 import com.pierbezuhoff.justtext.ui.isCompact
 import com.pierbezuhoff.justtext.ui.isExpanded
 import com.pierbezuhoff.justtext.ui.isLandscape
@@ -455,90 +459,6 @@ private fun HexInput(
 //                focusRequester.requestFocus(FocusDirection.Exit)
                 keyboard?.hide() // suppresses rare auto-showing keyboard bug
             }
-        }
-    }
-}
-
-@Composable
-fun SimpleButton(
-    iconPainter: Painter,
-    name: String,
-    modifier: Modifier = Modifier,
-    iconModifier: Modifier = Modifier,
-    contentColor: Color = LocalContentColor.current,
-    containerColor: Color = Color.Unspecified,
-    interactionSource: MutableInteractionSource? = null,
-    onClick: () -> Unit
-) {
-    IconButton(
-        onClick = onClick,
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor,
-        ),
-        interactionSource = interactionSource,
-        modifier = modifier,
-    ) {
-        Icon(
-            iconPainter,
-            contentDescription = name,
-            modifier = iconModifier,
-        )
-    }
-}
-
-@Composable
-fun DialogTitle(
-    @StringRes
-    titleStringResource: Int,
-    modifier: Modifier = Modifier,
-    smallerFont: Boolean = false,
-) {
-    Text(
-        text = stringResource(titleStringResource),
-        modifier = modifier.padding(16.dp),
-        color = MaterialTheme.colorScheme.primary,
-        style =
-            if (smallerFont) MaterialTheme.typography.titleMedium
-            else MaterialTheme.typography.titleLarge,
-    )
-}
-
-@Composable
-fun OkButton(
-    fontSize: TextUnit = 24.sp,
-    modifier: Modifier = Modifier,
-    onConfirm: () -> Unit,
-) {
-    Button(
-        onClick = { onConfirm() },
-        modifier = modifier.padding(4.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-        shape = CircleShape,
-    ) {
-        Icon(painterResource(R.drawable.confirm), "ok")
-        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-        Text(stringResource(R.string.ok_name), fontSize = fontSize)
-    }
-}
-
-@Composable
-fun CancelButton(
-    fontSize: TextUnit = 24.sp,
-    noText: Boolean = false,
-    modifier: Modifier = Modifier,
-    onDismissRequest: () -> Unit,
-) {
-    OutlinedButton(
-        onClick = { onDismissRequest() },
-        modifier = modifier.padding(4.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-        shape = CircleShape,
-    ) {
-        Icon(painterResource(R.drawable.close), "cancel")
-        if (!noText) {
-            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.cancel_name), fontSize = fontSize)
         }
     }
 }
