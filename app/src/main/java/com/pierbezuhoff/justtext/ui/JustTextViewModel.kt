@@ -18,13 +18,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -38,9 +36,12 @@ class JustTextViewModel(
     val uiStateFlow = MutableStateFlow(UiState(
         text = "hello",
     ))
-    val initialTextFlow = MutableStateFlow<String>("Welcome!")
-    val initialCursorLocationFlow = MutableStateFlow<Int>(0)
-    val backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
+    private val _initialTextFlow = MutableStateFlow<String>("Welcome!")
+    val initialTextFlow: StateFlow<String> = _initialTextFlow.asStateFlow()
+    private val _initialCursorLocationFlow = MutableStateFlow<Int>(0)
+    val initialCursorLocationFlow: StateFlow<Int> = _initialCursorLocationFlow.asStateFlow()
+    private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
+    val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()
     private val backgroundImageFile =
         File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
 
@@ -62,7 +63,7 @@ class JustTextViewModel(
             .bufferedReader()
             .useLines { lines ->
                 val text = lines.joinToString("\n")
-                initialTextFlow.update { text }
+                _initialTextFlow.update { text }
                 setText(text)
             }
     }
@@ -79,7 +80,7 @@ class JustTextViewModel(
                 uiStateFlow.update { it.copy(textColor = color) }
             }
             data[CURSOR_LOCATION]?.let { cursorLocation ->
-                initialCursorLocationFlow.update { cursorLocation }
+                _initialCursorLocationFlow.update { cursorLocation }
                 uiStateFlow.update { it.copy(cursorLocation = cursorLocation) }
             }
             data[FONT_SIZE]?.let { fontSize ->
@@ -90,22 +91,20 @@ class JustTextViewModel(
 
     private fun loadBackgroundImageFromFile() {
         if (backgroundImageFile.exists()) {
-            backgroundImageUri.update { getTaggedUri() }
+            _backgroundImageUri.update { getTaggedUri() }
         }
     }
 
     private fun startPeriodicSave() {
         if (!periodicSaveIsOn.value) {
             periodicSaveIsOn.update { true }
-            periodicSaveJob = viewModelScope.launch {
+            periodicSaveJob = viewModelScope.launch(Dispatchers.Default) {
                 flow {
                     while (true) {
                         emit(Unit)
                         delay(PERIODIC_SAVE_DELAY)
                     }
                 }
-                    .flowOn(Dispatchers.Default)
-                    .catch { e -> e.printStackTrace() }
                     .collect {
                         println("periodic save")
                         saveDatastoreData()
@@ -170,7 +169,7 @@ class JustTextViewModel(
                     }
                     val newTaggedUri = getTaggedUri()
                     println("finished copying new bg image $uri -> $newTaggedUri")
-                    backgroundImageUri.update { newTaggedUri }
+                    _backgroundImageUri.update { newTaggedUri }
                 } ?: println("cannot copy new bg image")
             } catch (e: Exception) {
                 println("failed to copy new bg image")
@@ -181,28 +180,28 @@ class JustTextViewModel(
 
     fun persistState() {
         saveTextToFile()
-        saveDatastoreData()
+        runBlocking {
+            saveDatastoreData()
+        }
     }
 
-    fun saveDatastoreData() {
-        runBlocking {
-            val uiState = uiStateFlow.value
-            dataStore.edit { preferences ->
-                uiState.textColor?.let { color ->
-                    preferences[TEXT_COLOR_KEY] = color.toLong()
-                }
-                uiState.textBackgroundColor?.let { color ->
-                    preferences[TEXT_BACKGROUND_COLOR_KEY] = color.toLong()
-                }
-                uiState.imageBackgroundColor?.let { color ->
-                    preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
-                }
-                uiState.cursorLocation.let { cursorLocation ->
-                    preferences[CURSOR_LOCATION] = cursorLocation
-                }
-                uiState.fontSize.let { fontSize ->
-                    preferences[FONT_SIZE] = fontSize
-                }
+    suspend fun saveDatastoreData() {
+        val uiState = uiStateFlow.value
+        dataStore.edit { preferences ->
+            uiState.textColor?.let { color ->
+                preferences[TEXT_COLOR_KEY] = color.toLong()
+            }
+            uiState.textBackgroundColor?.let { color ->
+                preferences[TEXT_BACKGROUND_COLOR_KEY] = color.toLong()
+            }
+            uiState.imageBackgroundColor?.let { color ->
+                preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
+            }
+            uiState.cursorLocation.let { cursorLocation ->
+                preferences[CURSOR_LOCATION] = cursorLocation
+            }
+            uiState.fontSize.let { fontSize ->
+                preferences[FONT_SIZE] = fontSize
             }
         }
     }
