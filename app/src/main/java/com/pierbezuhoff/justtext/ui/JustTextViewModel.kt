@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
 import kotlin.time.Duration.Companion.minutes
 
 class JustTextViewModel(
@@ -59,13 +60,18 @@ class JustTextViewModel(
     }
 
     private fun loadInitialTextFromFile() {
-        applicationContext.openFileInput(SAVED_TEXT_FILENAME)
-            .bufferedReader()
-            .useLines { lines ->
-                val text = lines.joinToString("\n")
-                _initialTextFlow.update { text }
-                setText(text)
-            }
+        try {
+            applicationContext.openFileInput(SAVED_TEXT_FILENAME)
+                .bufferedReader()
+                .useLines { lines ->
+                    val text = lines.joinToString("\n")
+                    _initialTextFlow.update { text }
+                    setText(text)
+                }
+        } catch (e: FileNotFoundException) {
+            // triggers on first install
+            println("No $SAVED_TEXT_FILENAME found")
+        }
     }
 
     private suspend fun loadDataStoreData() {
