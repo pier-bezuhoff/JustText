@@ -25,7 +25,7 @@
         </aapt:attr>
       </path>
       <path
-          android:name="cursor"
+          android:name = "cursor"
           android:pathData="m76.56,23v62"
           android:strokeWidth="3"
           android:fillColor="#00000000"
@@ -43,10 +43,10 @@
   <target android:name="cursor">
     <aapt:attr name="android:animation">
       <objectAnimator
-          android:propertyName="alpha"
+          android:duration="667"
+          android:propertyName="strokeAlpha"
           android:valueFrom="1.0"
           android:valueTo="0.0"
-          android:duration="500"
           android:repeatCount="-1"
           android:repeatMode="reverse"
       />

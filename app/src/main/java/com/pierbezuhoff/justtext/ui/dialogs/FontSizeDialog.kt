@@ -29,7 +29,6 @@ import kotlin.math.roundToInt
 
 private const val MIN_FONT_SIZE = 10 //15
 private const val MAX_FONT_SIZE = 60 //33
-// TODO: adjust between-character and between-line indents based on size
 
 @Composable
 fun FontSizeDialog(
