@@ -17,8 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 private enum class ColorsDialogType {
     TEXT,
@@ -41,7 +43,7 @@ fun ColorsDialog(
     val buttonModifier = Modifier.fillMaxWidth()
     val buttonColors = ButtonDefaults.textButtonColors()
         .copy(
-            containerColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         )
     Dialog(
@@ -50,8 +52,8 @@ fun ColorsDialog(
         Surface(
             modifier = modifier,
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f),
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(
                 Modifier
@@ -129,5 +131,16 @@ fun ColorsDialog(
             )
         }
         null -> {}
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ColorsDialogPreview() {
+    JustTextTheme {
+        ColorsDialog(
+            Color.Black, Color.Black, Color.Black,
+            {}, {}, {}, {}
+        )
     }
 }
