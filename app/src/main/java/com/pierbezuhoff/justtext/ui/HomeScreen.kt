@@ -37,13 +37,9 @@ import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
+import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
-
-enum class DialogType {
-    FONT_SIZE,
-    COLORS,
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
