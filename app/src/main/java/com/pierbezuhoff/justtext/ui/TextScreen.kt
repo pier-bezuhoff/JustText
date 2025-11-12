@@ -14,6 +14,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.sp
 
+// BUG: text unsaved on screen rotation
 @Composable
 fun TextScreen(
     initialText: String,

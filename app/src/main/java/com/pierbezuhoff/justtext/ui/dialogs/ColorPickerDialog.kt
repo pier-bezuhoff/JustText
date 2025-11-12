@@ -103,12 +103,6 @@ private val DEFAULT_PALETTE: List<Color> = listOf(
     JustTextColors.teal,
     JustTextColors.darkPurple,
     JustTextColors.skyBlue,
-    // UI colors (not sure it's a good idea... no contrast)
-//        DodeclustersColors.primaryDark, DodeclustersColors.primaryLight,
-//        DodeclustersColors.secondaryDark, DodeclustersColors.secondaryLight,
-    // DodeclustersColors.tertiaryDark, DodeclustersColors.tertiaryLight,
-    // tertiary and highAccent are the same, BUT highAccent is _actually_ used
-//        DodeclustersColors.highAccentDark, DodeclustersColors.highAccentLight,
 )
 
 @Composable
