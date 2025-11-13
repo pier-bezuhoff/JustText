@@ -5,13 +5,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withAnnotation
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -36,13 +39,19 @@ fun TextScreen(
         lineHeight = (1.1f*fontSize).sp,
         lineBreak = LineBreak.Paragraph,
     )
+    // this triggers way too often
+//    val annotatedTFValue = tfValue.copy(
+//        annotatedString = annotateUrlsInText(tfValue.text, Color.Green)
+//    )
+    // NOTE: rich text editing is not yet supported (since 2019..):
+    //  https://issuetracker.google.com/issues/135556699
     PatchedBasicTextField(
         tfValue,
         onValueChange = setTFValue,
         modifier = modifier,
         readOnly = readOnly,
         textStyle = textStyle,
-        minLines = 70,
+        minLines = 50,
         maxLines = Int.MAX_VALUE,
         cursorBrush = SolidColor(textColor),
         containerColor = textBackgroundColor,
@@ -54,7 +63,10 @@ private fun annotateUrlsInText(
     urlColor: Color,
 ): AnnotatedString {
     val textLinkStyles = TextLinkStyles(
-        style = SpanStyle(color = urlColor),
+        style = SpanStyle(
+            color = urlColor,
+            textDecoration = TextDecoration.Underline,
+        ),
     )
     // reference: https://stackoverflow.com/a/8943487/7143065
     // and 'www.'... without 'https://' start
@@ -71,7 +83,9 @@ private fun annotateUrlsInText(
             withLink(LinkAnnotation.Url(
                 url = urlText,
                 styles = textLinkStyles,
-//            linkInteractionListener = // on click
+                linkInteractionListener = {
+                    println("clicked $urlText")
+                } // on click
             )) {
                 append(urlText)
             }
@@ -79,28 +93,6 @@ private fun annotateUrlsInText(
         }
         val endingText = text.substring(i until text.length)
         append(endingText)
-    }
-}
-
-@Composable
-private fun AnnotatedLinkExample() {
-    val linkColor = MaterialTheme.colorScheme.primary
-    val annotatedString = buildAnnotatedString {
-        withLink(LinkAnnotation.Url(
-            url = "https://url.com",
-            styles = TextLinkStyles(
-                style = SpanStyle(color = linkColor),
-            )
-//            linkInteractionListener = // on click
-        )) {
-            append("visible clickable text")
-        }
-
-        withAnnotation(tag = "semanticLinkTag", annotation = "https://link.com") {
-            withStyle(style = SpanStyle(color = linkColor)) {
-                append("visibleLinkName")
-            }
-        }
     }
 }
 

@@ -19,11 +19,15 @@ import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -43,6 +47,10 @@ class JustTextViewModel(
     private val _uiStateFlow = MutableStateFlow(UiState())
     val uiStateFlow = _uiStateFlow.asStateFlow()
 
+    val textFlow: StateFlow<String> = uiStateFlow
+        .map { it.tfValue.text }
+        .stateInWhileSubscribed("")
+
     private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
     val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()
 
@@ -52,12 +60,15 @@ class JustTextViewModel(
     private val periodicSaveIsOn = MutableStateFlow(false)
     private var periodicSaveJob: Job? = null
 
+    private fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
+        stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), initialValue)
+
     fun startLoadingData() {
-        println("ViewModel.startLoadingData")
         viewModelScope.launch {
             loadInitialTextFromFile()
             loadBackgroundImageFromFile()
             loadDataStoreData()
+            markSaved()
             _uiStateFlow.update { it.copy(loadedFromDisk = true) }
             println("ViewModel loaded persistent data")
             startPeriodicSave()
