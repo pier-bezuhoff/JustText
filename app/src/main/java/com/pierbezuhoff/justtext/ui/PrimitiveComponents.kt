@@ -102,6 +102,10 @@ fun CancelButton(
         modifier = modifier.padding(4.dp),
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
         shape = CircleShape,
+        colors = ButtonDefaults.outlinedButtonColors()
+            .copy(
+                contentColor = MaterialTheme.colorScheme.primary,
+            ),
     ) {
         Icon(painterResource(R.drawable.close), "cancel")
         if (!noText) {
