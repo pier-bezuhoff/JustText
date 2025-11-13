@@ -3,6 +3,8 @@ package com.pierbezuhoff.justtext.ui
 import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -30,30 +32,33 @@ import java.io.File
 import java.io.FileNotFoundException
 import kotlin.time.Duration.Companion.minutes
 
+// NOTE: VM survives config changes but not OOM-related process kill,
+//  but we call VM.persistState in MainActivity.onPause,
+//  so the important elements of UiState are saved via dataStore
 class JustTextViewModel(
     private val applicationContext: Context,
     private val dataStore: DataStore<Preferences>,
 ) : ViewModel() {
-    val uiStateFlow = MutableStateFlow(UiState(
-        text = "hello",
-    ))
-    private val _initialTextFlow = MutableStateFlow<String>("Welcome!")
-    val initialTextFlow: StateFlow<String> = _initialTextFlow.asStateFlow()
-    private val _initialCursorLocationFlow = MutableStateFlow<Int>(0)
-    val initialCursorLocationFlow: StateFlow<Int> = _initialCursorLocationFlow.asStateFlow()
+    // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
+    private val _uiStateFlow = MutableStateFlow(UiState())
+    val uiStateFlow = _uiStateFlow.asStateFlow()
+
     private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
     val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()
+
     private val backgroundImageFile =
         File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
 
     private val periodicSaveIsOn = MutableStateFlow(false)
     private var periodicSaveJob: Job? = null
 
-    init {
+    fun startLoadingData() {
+        println("ViewModel.startLoadingData")
         viewModelScope.launch {
             loadInitialTextFromFile()
             loadBackgroundImageFromFile()
             loadDataStoreData()
+            _uiStateFlow.update { it.copy(loadedFromDisk = true) }
             println("ViewModel loaded persistent data")
             startPeriodicSave()
         }
@@ -65,32 +70,42 @@ class JustTextViewModel(
                 .bufferedReader()
                 .useLines { lines ->
                     val text = lines.joinToString("\n")
-                    _initialTextFlow.update { text }
-                    setText(text)
+                    _uiStateFlow.update {
+                        it.copy(
+                            tfValue = TextFieldValue(text, TextRange(text.length))
+                        )
+                    }
                 }
-        } catch (e: FileNotFoundException) {
+        } catch (_: FileNotFoundException) {
             // triggers on first install
             println("No $SAVED_TEXT_FILENAME found")
         }
     }
 
+    // assumption: dataStore has just been loaded
     private suspend fun loadDataStoreData() {
+        // .firstOrNull assumes that data flow has 0 or 1 entries
+        // otherwise we are getting the oldest one which might be undesirable
         dataStore.data.firstOrNull()?.let { data ->
-            data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
-                uiStateFlow.update { it.copy(imageBackgroundColor = color) }
-            }
-            data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()?.let { color ->
-                uiStateFlow.update { it.copy(textBackgroundColor = color) }
-            }
-            data[TEXT_COLOR_KEY]?.toULong()?.let { color ->
-                uiStateFlow.update { it.copy(textColor = color) }
-            }
-            data[CURSOR_LOCATION]?.let { cursorLocation ->
-                _initialCursorLocationFlow.update { cursorLocation }
-                uiStateFlow.update { it.copy(cursorLocation = cursorLocation) }
-            }
-            data[FONT_SIZE]?.let { fontSize ->
-                uiStateFlow.update { it.copy(fontSize = fontSize) }
+            val imageBackgroundColor = data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()
+            val textBackgroundColor = data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()
+            val textColor = data[TEXT_COLOR_KEY]?.toULong()
+            val cursorLocation = data[CURSOR_LOCATION]
+            val fontSize = data[FONT_SIZE]
+            _uiStateFlow.update { state ->
+                state.copy(
+                    tfValue = if (cursorLocation == null) {
+                        state.tfValue
+                    } else {
+                        state.tfValue.copy(
+                            selection = TextRange(cursorLocation)
+                        )
+                    },
+                    fontSize = fontSize ?: state.fontSize,
+                    textColor = textColor ?: state.textColor,
+                    textBackgroundColor = textBackgroundColor ?: state.textBackgroundColor,
+                    imageBackgroundColor = imageBackgroundColor ?: state.imageBackgroundColor,
+                )
             }
         }
     }
@@ -98,6 +113,25 @@ class JustTextViewModel(
     private fun loadBackgroundImageFromFile() {
         if (backgroundImageFile.exists()) {
             _backgroundImageUri.update { getTaggedUri() }
+        }
+    }
+
+    private fun markSaved() {
+        _uiStateFlow.update { it.copy(syncedToDisk = true) }
+    }
+
+    private fun markUnsaved() {
+        _uiStateFlow.update { it.copy(syncedToDisk = false) }
+    }
+
+    fun save() {
+        viewModelScope.launch {
+            saveDatastoreData()
+            withContext(Dispatchers.IO) {
+                saveTextToFile()
+            }
+            markSaved()
+            println("saved.")
         }
     }
 
@@ -113,10 +147,7 @@ class JustTextViewModel(
                 }
                     .collect {
                         println("periodic save")
-                        saveDatastoreData()
-                        withContext(Dispatchers.IO) {
-                            saveTextToFile()
-                        }
+                        save()
                     }
             }
         }
@@ -132,38 +163,35 @@ class JustTextViewModel(
             Uri.fromFile(backgroundImageFile)
         )
 
-    fun setCursorLocation(cursorLocation: Int) {
-        uiStateFlow.update {
-            it.copy(cursorLocation = cursorLocation)
-        }
-    }
-
     fun setFontSize(fontSize: Int) {
-        uiStateFlow.update {
+        _uiStateFlow.update {
             it.copy(fontSize = fontSize)
         }
     }
 
     fun setTextColor(color: Color) {
-        uiStateFlow.update {
+        _uiStateFlow.update {
             it.copy(textColor = color.value)
         }
     }
 
     fun setTextBackgroundColor(color: Color) {
-        uiStateFlow.update {
+        _uiStateFlow.update {
             it.copy(textBackgroundColor = color.value)
         }
     }
 
     fun setImageBackgroundColor(color: Color) {
-        uiStateFlow.update {
+        _uiStateFlow.update {
             it.copy(imageBackgroundColor = color.value)
         }
     }
 
-    fun setText(text: String) {
-        uiStateFlow.update { it.copy(text = text) }
+    fun setTFValue(newTFValue: TextFieldValue) {
+        if (newTFValue.text != uiStateFlow.value.tfValue.text) {
+            markUnsaved()
+        }
+        _uiStateFlow.update { it.copy(tfValue = newTFValue) }
     }
 
     fun setBackgroundImage(uri: Uri) {
@@ -189,10 +217,11 @@ class JustTextViewModel(
         runBlocking {
             saveDatastoreData()
         }
+        markSaved()
     }
 
     suspend fun saveDatastoreData() {
-        val uiState = uiStateFlow.value
+        val uiState = _uiStateFlow.value
         dataStore.edit { preferences ->
             uiState.textColor?.let { color ->
                 preferences[TEXT_COLOR_KEY] = color.toLong()
@@ -203,7 +232,7 @@ class JustTextViewModel(
             uiState.imageBackgroundColor?.let { color ->
                 preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
             }
-            uiState.cursorLocation.let { cursorLocation ->
+            uiState.tfValue.selection.start.let { cursorLocation ->
                 preferences[CURSOR_LOCATION] = cursorLocation
             }
             uiState.fontSize.let { fontSize ->
@@ -214,7 +243,7 @@ class JustTextViewModel(
 
     fun saveTextToFile() {
         try {
-            val text = uiStateFlow.value.text
+            val text = _uiStateFlow.value.tfValue.text
             applicationContext.openFileOutput(SAVED_TEXT_FILENAME, Context.MODE_PRIVATE).use {
                 it.write(text.toByteArray())
             }

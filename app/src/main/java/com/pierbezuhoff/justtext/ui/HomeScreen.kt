@@ -14,9 +14,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -39,7 +42,6 @@ import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
-import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,8 +57,6 @@ fun HomeScreen(
             println("PhotoPicker: No media selected")
         }
     }
-    val initialText by viewModel.initialTextFlow.collectAsStateWithLifecycle()
-    val initialCursorLocation by viewModel.initialCursorLocationFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
@@ -108,7 +108,22 @@ fun HomeScreen(
                             )
                         }
                     },
-                    title = {},
+                    title = {
+                        TextButton(
+                            onClick = viewModel::save,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            enabled = !uiState.syncedToDisk,
+                        ) {
+                            Text(
+                                text =
+                                    if (uiState.syncedToDisk)
+                                        "Saved"
+                                    else "Save"
+                                ,
+                                style = MaterialTheme.typography.headlineSmall
+                            )
+                        }
+                    },
                     actions = {
                         IconButton(
                             onClick = {
@@ -159,13 +174,12 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
                 TextScreen(
-                    initialText = initialText,
-                    initialCursorLocation = initialCursorLocation,
+                    tfValue = uiState.tfValue,
                     fontSize = uiState.fontSize,
                     textColor = textColor,
                     textBackgroundColor = textBackgroundColor,
-                    onNewText = viewModel::setText,
-                    onNewCursorLocation = viewModel::setCursorLocation,
+                    readOnly = !uiState.loadedFromDisk,
+                    setTFValue = viewModel::setTFValue,
                 )
             }
         }
@@ -207,12 +221,10 @@ fun HomeScreen(
         }
         null -> {}
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    JustTextTheme {
-        TextScreen("hi!!!!!", 0, 30, Color.Black, Color.LightGray, {}, {})
+    LaunchedEffect(viewModel) {
+        if (!uiState.loadedFromDisk) {
+            viewModel.startLoadingData()
+        }
     }
 }
+
