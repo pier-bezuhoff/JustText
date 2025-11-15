@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,10 +45,6 @@ class JustTextViewModel(
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
     private val _uiStateFlow = MutableStateFlow(UiState())
     val uiStateFlow = _uiStateFlow.asStateFlow()
-
-    val textFlow: StateFlow<String> = uiStateFlow
-        .map { it.tfValue.text }
-        .stateInWhileSubscribed("")
 
     private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
     val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()

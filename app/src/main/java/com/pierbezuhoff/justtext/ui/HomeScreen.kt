@@ -44,6 +44,7 @@ import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 
+// MAYBE: add quick in-text search button
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
