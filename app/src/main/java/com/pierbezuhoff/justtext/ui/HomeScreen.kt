@@ -64,135 +64,135 @@ fun HomeScreen(
     val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
     val imageBackgroundColor = uiState.imageBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.surface
-        Scaffold(
-            modifier = modifier,
-            topBar = {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                viewModel.persistState()
-                                quitApp()
-                            },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.close),
-                                "quit"
-                            )
-                        }
-                    },
-                    title = {
-                        TextButton(
-                            onClick = viewModel::save,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            enabled = !uiState.syncedToDisk,
-                            colors = ButtonDefaults.textButtonColors().copy(
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                    .copy(alpha = 0.5f)
-                                ,
-                            )
-                        ) {
-                            Text(
-                                text =
-                                    if (uiState.syncedToDisk)
-                                        "Saved"
-                                    else "Save"
-                                ,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                openedDialogType = DialogType.FONT_SIZE
-                            }
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.text_size),
-                                "choose font size"
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                openedDialogType = DialogType.COLORS
-                            }
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.palette),
-                                "choose ui colors"
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                            },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.background_image),
-                                "choose bg image"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
-                        navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    ),
-                )
-            },
-            containerColor = Color.Transparent,
-        ) { innerPadding ->
-            Box(
-                Modifier
-                    .padding(innerPadding)
-                    .drawBehind {
-                        drawRect(
-                            uiState.imageBackgroundColor?.let { Color(it) } ?: imageBackgroundColor
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(
+                        onClick = {
+                            viewModel.persistState()
+                            quitApp()
+                        },
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.close),
+                            "quit"
                         )
                     }
-            ) {
-                backgroundImageUri?.let { taggedUri ->
-                    key(taggedUri) { // essential
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(taggedUri.uri)
-                                // since we have always the same uri, but diff content
-                                // caching is a no-go
-                                .memoryCachePolicy(CachePolicy.DISABLED)
-                                .diskCachePolicy(CachePolicy.DISABLED)
-                                .crossfade(500)
-                                .build()
+                },
+                title = {
+                    TextButton(
+                        onClick = viewModel::save,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        enabled = !uiState.syncedToDisk,
+                        colors = ButtonDefaults.textButtonColors().copy(
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                .copy(alpha = 0.5f)
                             ,
-                            contentDescription = "background",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                            alpha = 1f,
+                        )
+                    ) {
+                        Text(
+                            text =
+                                if (uiState.syncedToDisk)
+                                    "Saved"
+                                else "Save"
+                            ,
+                            style = MaterialTheme.typography.headlineSmall
                         )
                     }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            openedDialogType = DialogType.FONT_SIZE
+                        }
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.text_size),
+                            "choose font size"
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            openedDialogType = DialogType.COLORS
+                        }
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.palette),
+                            "choose ui colors"
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.background_image),
+                            "choose bg image"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ),
+            )
+        },
+        containerColor = Color.Transparent,
+    ) { innerPadding ->
+        Box(
+            Modifier
+                .padding(innerPadding)
+                .drawBehind {
+                    drawRect(
+                        uiState.imageBackgroundColor?.let { Color(it) } ?: imageBackgroundColor
+                    )
                 }
-                // BUG: when keyboard appears, in its future place image overlays becomes
-                //  bright alpha=0
-                //  (seemingly only on older Android versions)
-                Surface(
-                    modifier = Modifier
-                        .consumeWindowInsets(innerPadding)
-                        .safeDrawingPadding()
-                    ,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
-                ) {
-                    TextScreen(
-                        tfValue = uiState.tfValue,
-                        fontSize = uiState.fontSize,
-                        textColor = textColor,
-                        textBackgroundColor = textBackgroundColor,
-                        readOnly = !uiState.loadedFromDisk,
-                        setTFValue = viewModel::setTFValue,
+        ) {
+            backgroundImageUri?.let { taggedUri ->
+                key(taggedUri) { // essential
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(taggedUri.uri)
+                            // since we have always the same uri, but diff content
+                            // caching is a no-go
+                            .memoryCachePolicy(CachePolicy.DISABLED)
+                            .diskCachePolicy(CachePolicy.DISABLED)
+                            .crossfade(500)
+                            .build()
+                        ,
+                        contentDescription = "background",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                        alpha = 1f,
                     )
                 }
             }
+            // BUG: when keyboard appears, in its future place image overlays becomes
+            //  bright alpha=0
+            //  (seemingly only on older Android versions)
+            Surface(
+                modifier = Modifier
+                    .consumeWindowInsets(innerPadding)
+                    .safeDrawingPadding()
+                ,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
+            ) {
+                TextScreen(
+                    tfValue = uiState.tfValue,
+                    fontSize = uiState.fontSize,
+                    textColor = textColor,
+                    textBackgroundColor = textBackgroundColor,
+                    readOnly = !uiState.loadedFromDisk,
+                    setTFValue = viewModel::setTFValue,
+                )
+            }
         }
+    }
     when (openedDialogType) {
         DialogType.FONT_SIZE -> {
             FontSizeDialog(

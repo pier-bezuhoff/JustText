@@ -14,19 +14,19 @@ import androidx.compose.ui.graphics.Color
 private val primaryLight = Color(0xFF_1a4cab)
 private val onPrimaryLight = Color(0xFF_ffffff)
 private val primaryContainerLight = Color(0xFF_003587)
-private val onPrimaryContainerLight = Color(0xFF_afc4ff) // low contrast
+private val onPrimaryContainerLight = Color(0xFF_cedbff)
 private val secondaryLight = Color(0xFF_4FC3F7)
-private val onSecondaryLight = Color(0xFF_01579B) // low contrast
+private val onSecondaryLight = Color(0xFF_054a6a) // low contrast
 private val secondaryContainerLight = Color(0xFF_0277BD)
 private val onSecondaryContainerLight = Color(0xFF_E1F5FE)
 
 private val primaryDark = Color(0xFF_b2c5ff)
 private val onPrimaryDark = Color(0xFF_002c72)
-private val primaryContainerDark = Color(0xFF_1a4cab) // too bright
+private val primaryContainerDark = Color(0xFF_1a4cab) // too bright(?)
 private val onPrimaryContainerDark = Color(0xFF_afc4ff)
 private val secondaryDark = Color(0xFF_0288D1)
-private val onSecondaryDark = Color(0xFF_B3E5FC)
-private val secondaryContainerDark = Color(0xFF_01579B) // too bright
+private val onSecondaryDark = Color(0xFF_012e47)
+private val secondaryContainerDark = Color(0xFF_014d76)
 private val onSecondaryContainerDark = Color(0xFF_B3E5FC)
 
 internal val LightScheme = lightColorScheme(
