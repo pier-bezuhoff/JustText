@@ -96,8 +96,8 @@ class JustTextViewModel(
             val imageBackgroundColor = data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()
             val textBackgroundColor = data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()
             val textColor = data[TEXT_COLOR_KEY]?.toULong()
-            val cursorLocation = data[CURSOR_LOCATION]
-            val fontSize = data[FONT_SIZE]
+            val cursorLocation = data[CURSOR_LOCATION_KEY]
+            val fontSize = data[FONT_SIZE_KEY]
             _uiStateFlow.update { state ->
                 state.copy(
                     tfValue = if (cursorLocation == null) {
@@ -239,10 +239,10 @@ class JustTextViewModel(
                 preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
             }
             uiState.tfValue.selection.start.let { cursorLocation ->
-                preferences[CURSOR_LOCATION] = cursorLocation
+                preferences[CURSOR_LOCATION_KEY] = cursorLocation
             }
             uiState.fontSize.let { fontSize ->
-                preferences[FONT_SIZE] = fontSize
+                preferences[FONT_SIZE_KEY] = fontSize
             }
         }
     }
@@ -283,12 +283,12 @@ class JustTextViewModel(
 
         private val PERIODIC_SAVE_DELAY = 3.minutes
 
-//        private val TEXT_KEY = stringPreferencesKey("text")
-        private val CURSOR_LOCATION = intPreferencesKey("cursor_location")
-        private val FONT_SIZE = intPreferencesKey("font_size")
+        private val CURSOR_LOCATION_KEY = intPreferencesKey("cursor_location")
+        private val FONT_SIZE_KEY = intPreferencesKey("font_size")
         private val TEXT_COLOR_KEY = longPreferencesKey("text_color")
         private val TEXT_BACKGROUND_COLOR_KEY = longPreferencesKey("text_background_color")
         private val IMAGE_BACKGROUND_COLOR_KEY = longPreferencesKey("image_background_color")
+
         private const val SAVED_TEXT_FILENAME = "saved-text.txt"
         private const val BACKGROUND_IMAGE_FILENAME = "background-image.jpg"
     }

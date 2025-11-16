@@ -1,5 +1,7 @@
 package com.pierbezuhoff.justtext.ui
 
+import androidx.compose.foundation.text.contextmenu.builder.item
+import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -9,6 +11,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.LineBreak
@@ -18,6 +21,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
+private data object DeleteSelectionKey
+
+// MAYBE: migrate to TextFieldState for proper Delete context action
 @Composable
 fun TextScreen(
     tfValue: TextFieldValue,
@@ -44,7 +50,30 @@ fun TextScreen(
     PatchedBasicTextField(
         tfValue,
         onValueChange = setTFValue,
-        modifier = modifier,
+        modifier = modifier
+            .appendTextContextMenuComponents {
+                separator()
+                item(DeleteSelectionKey, "Delete") {
+                    // NOTE: when selection is auto-expanded (eg after selecting a phone-like number)
+                    //  (see ComposeFoundationFlags.isSmartSelectionEnabled)
+                    //  tfValue.selection points to the initial, smaller selection
+                    //  so it Deletes only it (built-in Cut works somehow)
+                    //  built-in Cut is defined as
+                    //  `textFieldState.deleteSelectedText()` + add result to clipboard
+//                    println("Delete context-action ${tfValue.selection} / comp ${tfValue.composition}")
+                    val range = tfValue.selection
+                    val text = tfValue.text
+                    val newText = text.removeRange(range.min, range.max)
+                    setTFValue(
+                        TextFieldValue(
+                            text = newText,
+                            selection = TextRange(range.min)
+                        )
+                    )
+                    close()
+                }
+            }
+        ,
         readOnly = readOnly,
         textStyle = textStyle,
         minLines = 50,
