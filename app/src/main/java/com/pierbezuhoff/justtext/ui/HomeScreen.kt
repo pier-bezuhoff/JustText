@@ -4,6 +4,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -31,6 +33,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -147,7 +150,11 @@ fun HomeScreen(
     ) { innerPadding ->
         Box(
             Modifier
-                .padding(innerPadding)
+                // this weird padding chemistry is needed to hide random white rect at the bottom
+                .padding(
+                    top = innerPadding.calculateTopPadding(),
+                )
+                .fillMaxSize()
                 .drawBehind {
                     drawRect(
                         uiState.imageBackgroundColor?.let { Color(it) } ?: imageBackgroundColor
@@ -178,6 +185,11 @@ fun HomeScreen(
             //  (seemingly only on older Android versions)
             Surface(
                 modifier = Modifier
+                    .padding(
+                        start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
+                        end = innerPadding.calculateEndPadding(LocalLayoutDirection.current),
+                        bottom = innerPadding.calculateBottomPadding(),
+                    )
                     .consumeWindowInsets(innerPadding)
                     .safeDrawingPadding()
                 ,
