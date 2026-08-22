@@ -26,7 +26,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            JustTextTheme(colorTheme = ColorTheme.Auto) {
+            JustTextTheme(
+                colorTheme = ColorTheme.Auto
+//                colorTheme = ColorTheme.Dark
+            ) {
                 HomeScreen(
                     viewModel = viewModel,
                     quitApp = {

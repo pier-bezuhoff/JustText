@@ -1,16 +1,19 @@
 [versions]
+kotlin = "2.4.10"
 #noinspection AndroidGradlePluginVersion
-agp = "8.10.1"
-kotlin = "2.2.20"
-composeBom = "2025.09.01"
-coreKtx = "1.17.0"
-splashScreen = "1.0.1"
-lifecycle = "2.9.4"
-activityCompose = "1.11.0"
-datastore = "1.1.7"
-serialization = "1.9.0"
-coil = "3.2.0"
+agp = "9.1.0"
+composeBom = "2026.06.01" # 2026.08.00 requires targetSdk 37
+
+# these can be aligned to ddc dep versions
+coreKtx = "1.18.0"
+lifecycle = "2.11.0-beta01"
+activityCompose = "1.13.0"
+serialization = "1.11.0"
 colormath = "3.6.1"
+
+splashScreen = "1.2.0"
+datastore = "1.2.1"
+coil = "3.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

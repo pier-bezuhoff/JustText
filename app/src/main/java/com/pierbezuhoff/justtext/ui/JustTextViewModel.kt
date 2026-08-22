@@ -43,8 +43,8 @@ class JustTextViewModel(
     private val dataStore: DataStore<Preferences>,
 ) : ViewModel() {
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
-    private val _uiStateFlow = MutableStateFlow(UiState())
-    val uiStateFlow = _uiStateFlow.asStateFlow()
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
     val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()
@@ -64,7 +64,7 @@ class JustTextViewModel(
             loadBackgroundImageFromFile()
             loadDataStoreData()
             markSaved()
-            _uiStateFlow.update { it.copy(loadedFromDisk = true) }
+            _uiState.update { it.copy(loadedFromDisk = true) }
             println("ViewModel loaded persistent data")
             startPeriodicSave()
         }
@@ -76,7 +76,7 @@ class JustTextViewModel(
                 .bufferedReader()
                 .useLines { lines ->
                     val text = lines.joinToString("\n")
-                    _uiStateFlow.update {
+                    _uiState.update {
                         it.copy(
                             tfValue = TextFieldValue(text, TextRange(text.length))
                         )
@@ -98,7 +98,7 @@ class JustTextViewModel(
             val textColor = data[TEXT_COLOR_KEY]?.toULong()
             val cursorLocation = data[CURSOR_LOCATION_KEY]
             val fontSize = data[FONT_SIZE_KEY]
-            _uiStateFlow.update { state ->
+            _uiState.update { state ->
                 state.copy(
                     tfValue = if (cursorLocation == null) {
                         state.tfValue
@@ -123,11 +123,11 @@ class JustTextViewModel(
     }
 
     private fun markSaved() {
-        _uiStateFlow.update { it.copy(syncedToDisk = true) }
+        _uiState.update { it.copy(syncedToDisk = true) }
     }
 
     private fun markUnsaved() {
-        _uiStateFlow.update { it.copy(syncedToDisk = false) }
+        _uiState.update { it.copy(syncedToDisk = false) }
     }
 
     fun save() {
@@ -170,34 +170,34 @@ class JustTextViewModel(
         )
 
     fun setFontSize(fontSize: Int) {
-        _uiStateFlow.update {
+        _uiState.update {
             it.copy(fontSize = fontSize)
         }
     }
 
     fun setTextColor(color: Color) {
-        _uiStateFlow.update {
+        _uiState.update {
             it.copy(textColor = color.value)
         }
     }
 
     fun setTextBackgroundColor(color: Color) {
-        _uiStateFlow.update {
+        _uiState.update {
             it.copy(textBackgroundColor = color.value)
         }
     }
 
     fun setImageBackgroundColor(color: Color) {
-        _uiStateFlow.update {
+        _uiState.update {
             it.copy(imageBackgroundColor = color.value)
         }
     }
 
     fun setTFValue(newTFValue: TextFieldValue) {
-        if (newTFValue.text != uiStateFlow.value.tfValue.text) {
+        if (newTFValue.text != uiState.value.tfValue.text) {
             markUnsaved()
         }
-        _uiStateFlow.update { it.copy(tfValue = newTFValue) }
+        _uiState.update { it.copy(tfValue = newTFValue) }
     }
 
     fun setBackgroundImage(uri: Uri) {
@@ -227,7 +227,7 @@ class JustTextViewModel(
     }
 
     suspend fun saveDatastoreData() {
-        val uiState = _uiStateFlow.value
+        val uiState = _uiState.value
         dataStore.edit { preferences ->
             uiState.textColor?.let { color ->
                 preferences[TEXT_COLOR_KEY] = color.toLong()
@@ -249,7 +249,7 @@ class JustTextViewModel(
 
     fun saveTextToFile() {
         try {
-            val text = _uiStateFlow.value.tfValue.text
+            val text = _uiState.value.tfValue.text
             applicationContext.openFileOutput(SAVED_TEXT_FILENAME, Context.MODE_PRIVATE).use {
                 it.write(text.toByteArray())
             }

@@ -62,7 +62,7 @@ fun HomeScreen(
             println("PhotoPicker: No media selected")
         }
     }
-    val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
     val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
@@ -192,6 +192,9 @@ fun HomeScreen(
                     )
                     .consumeWindowInsets(innerPadding)
                     .safeDrawingPadding()
+                    .drawBehind {
+                        drawRect(textBackgroundColor)
+                    }
                 ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
@@ -199,7 +202,6 @@ fun HomeScreen(
                     tfValue = uiState.tfValue,
                     fontSize = uiState.fontSize,
                     textColor = textColor,
-                    textBackgroundColor = textBackgroundColor,
                     readOnly = !uiState.loadedFromDisk,
                     setTFValue = viewModel::setTFValue,
                 )

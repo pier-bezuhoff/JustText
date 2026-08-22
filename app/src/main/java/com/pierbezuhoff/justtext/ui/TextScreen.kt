@@ -1,5 +1,6 @@
 package com.pierbezuhoff.justtext.ui
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
 import androidx.compose.material3.MaterialTheme
@@ -7,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -18,6 +20,8 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
@@ -29,7 +33,6 @@ fun TextScreen(
     tfValue: TextFieldValue,
     fontSize: Int,
     textColor: Color,
-    textBackgroundColor: Color,
     readOnly: Boolean,
     setTFValue: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier
@@ -45,12 +48,19 @@ fun TextScreen(
 //    val annotatedTFValue = tfValue.copy(
 //        annotatedString = annotateUrlsInText(tfValue.text, Color.Green)
 //    )
+    val startPadding = with (LocalDensity.current) {
+        12.sp.toDp()
+    }
+    val endPadding = with (LocalDensity.current) {
+        4.sp.toDp()
+    }
     // NOTE: rich text editing is not yet supported (since 2019..):
     //  https://issuetracker.google.com/issues/135556699
     PatchedBasicTextField(
         tfValue,
         onValueChange = setTFValue,
         modifier = modifier
+            .padding(start = startPadding, end = endPadding)
             .appendTextContextMenuComponents {
                 separator()
                 item(DeleteSelectionKey, "Delete") {
@@ -79,7 +89,7 @@ fun TextScreen(
         minLines = 50,
         maxLines = Int.MAX_VALUE,
         cursorBrush = SolidColor(textColor),
-        containerColor = textBackgroundColor,
+        containerColor = Color.Transparent,
     )
 }
 
@@ -129,7 +139,6 @@ private fun HomeScreenPreview() {
             tfValue = TextFieldValue("hi!!!!!"),
             fontSize = 30,
             textColor = Color.Black,
-            textBackgroundColor = Color.LightGray,
             readOnly = false,
             setTFValue = {},
         )
