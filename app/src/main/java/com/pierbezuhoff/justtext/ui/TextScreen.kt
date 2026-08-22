@@ -20,9 +20,8 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 private data object DeleteSelectionKey
@@ -34,8 +33,8 @@ fun TextScreen(
     fontSize: Int,
     textColor: Color,
     readOnly: Boolean,
-    setTFValue: (TextFieldValue) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    setTFValue: (TextFieldValue) -> Unit = {},
 ) {
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = textColor,
@@ -133,14 +132,13 @@ private fun annotateUrlsInText(
 
 @Preview(showBackground = true)
 @Composable
-private fun HomeScreenPreview() {
-    JustTextTheme {
+private fun TextScreenPreview() {
+    JustTextTheme(ColorTheme.Dark) {
         TextScreen(
             tfValue = TextFieldValue("hi!!!!!"),
             fontSize = 30,
             textColor = Color.Black,
             readOnly = false,
-            setTFValue = {},
         )
     }
 }

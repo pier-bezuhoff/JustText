@@ -1,21 +1,15 @@
 package com.pierbezuhoff.justtext
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
-import com.pierbezuhoff.justtext.ui.HomeScreen
+import com.pierbezuhoff.justtext.ui.HomeScreenRoot
 import com.pierbezuhoff.justtext.ui.JustTextViewModel
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
-
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "save")
 
 class MainActivity : ComponentActivity() {
 
@@ -30,7 +24,7 @@ class MainActivity : ComponentActivity() {
                 colorTheme = ColorTheme.Auto
 //                colorTheme = ColorTheme.Dark
             ) {
-                HomeScreen(
+                HomeScreenRoot(
                     viewModel = viewModel,
                     quitApp = {
                         finishAndRemoveTask()

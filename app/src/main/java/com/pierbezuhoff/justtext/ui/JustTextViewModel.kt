@@ -1,6 +1,5 @@
 package com.pierbezuhoff.justtext.ui
 
-import android.content.Context
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
@@ -14,49 +13,40 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.pierbezuhoff.justtext.data.BackgroundImageRepo
 import com.pierbezuhoff.justtext.data.TaggedUri
+import com.pierbezuhoff.justtext.data.TextRepo
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileNotFoundException
 import kotlin.time.Duration.Companion.minutes
 
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via dataStore
 class JustTextViewModel(
-    private val applicationContext: Context,
     private val dataStore: DataStore<Preferences>,
+    private val textRepo: TextRepo,
+    private val backgroundImageRepo: BackgroundImageRepo,
 ) : ViewModel() {
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
-    private val _uiState = MutableStateFlow(UiState())
-    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<UiState>
+        field = MutableStateFlow(UiState())
 
-    private val _backgroundImageUri = MutableStateFlow<TaggedUri?>(null)
-    val backgroundImageUri: StateFlow<TaggedUri?> = _backgroundImageUri.asStateFlow()
-
-    private val backgroundImageFile =
-        File(applicationContext.filesDir, BACKGROUND_IMAGE_FILENAME)
+    val backgroundImageUri: StateFlow<TaggedUri?>
+        field = MutableStateFlow<TaggedUri?>(null)
 
     private val periodicSaveIsOn = MutableStateFlow(false)
     private var periodicSaveJob: Job? = null
-
-    private fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
-        stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), initialValue)
 
     fun startLoadingData() {
         viewModelScope.launch {
@@ -64,28 +54,21 @@ class JustTextViewModel(
             loadBackgroundImageFromFile()
             loadDataStoreData()
             markSaved()
-            _uiState.update { it.copy(loadedFromDisk = true) }
+            uiState.update { it.copy(loadedFromDisk = true) }
             println("ViewModel loaded persistent data")
             startPeriodicSave()
         }
     }
 
     private fun loadInitialTextFromFile() {
-        try {
-            applicationContext.openFileInput(SAVED_TEXT_FILENAME)
-                .bufferedReader()
-                .useLines { lines ->
-                    val text = lines.joinToString("\n")
-                    _uiState.update {
-                        it.copy(
-                            tfValue = TextFieldValue(text, TextRange(text.length))
-                        )
-                    }
+        textRepo.load()
+            .onSuccess { text ->
+                uiState.update {
+                    it.copy(
+                        tfValue = TextFieldValue(text, TextRange(text.length))
+                    )
                 }
-        } catch (_: FileNotFoundException) {
-            // triggers on first install
-            println("No $SAVED_TEXT_FILENAME found")
-        }
+            }
     }
 
     // assumption: dataStore has just been loaded
@@ -98,7 +81,7 @@ class JustTextViewModel(
             val textColor = data[TEXT_COLOR_KEY]?.toULong()
             val cursorLocation = data[CURSOR_LOCATION_KEY]
             val fontSize = data[FONT_SIZE_KEY]
-            _uiState.update { state ->
+            uiState.update { state ->
                 state.copy(
                     tfValue = if (cursorLocation == null) {
                         state.tfValue
@@ -117,17 +100,17 @@ class JustTextViewModel(
     }
 
     private fun loadBackgroundImageFromFile() {
-        if (backgroundImageFile.exists()) {
-            _backgroundImageUri.update { getTaggedUri() }
+        backgroundImageRepo.load().getOrNull()?.let { newImage ->
+            backgroundImageUri.update { newImage }
         }
     }
 
     private fun markSaved() {
-        _uiState.update { it.copy(syncedToDisk = true) }
+        uiState.update { it.copy(syncedToDisk = true) }
     }
 
     private fun markUnsaved() {
-        _uiState.update { it.copy(syncedToDisk = false) }
+        uiState.update { it.copy(syncedToDisk = false) }
     }
 
     fun save() {
@@ -164,31 +147,26 @@ class JustTextViewModel(
         periodicSaveIsOn.update { false }
     }
 
-    private fun getTaggedUri(): TaggedUri =
-        TaggedUri(
-            Uri.fromFile(backgroundImageFile)
-        )
-
     fun setFontSize(fontSize: Int) {
-        _uiState.update {
+        uiState.update {
             it.copy(fontSize = fontSize)
         }
     }
 
     fun setTextColor(color: Color) {
-        _uiState.update {
+        uiState.update {
             it.copy(textColor = color.value)
         }
     }
 
     fun setTextBackgroundColor(color: Color) {
-        _uiState.update {
+        uiState.update {
             it.copy(textBackgroundColor = color.value)
         }
     }
 
     fun setImageBackgroundColor(color: Color) {
-        _uiState.update {
+        uiState.update {
             it.copy(imageBackgroundColor = color.value)
         }
     }
@@ -197,24 +175,15 @@ class JustTextViewModel(
         if (newTFValue.text != uiState.value.tfValue.text) {
             markUnsaved()
         }
-        _uiState.update { it.copy(tfValue = newTFValue) }
+        uiState.update { it.copy(tfValue = newTFValue) }
     }
 
     fun setBackgroundImage(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                applicationContext.contentResolver.openInputStream(uri)?.use { input ->
-                    backgroundImageFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                    val newTaggedUri = getTaggedUri()
-                    println("finished copying new bg image $uri -> $newTaggedUri")
-                    _backgroundImageUri.update { newTaggedUri }
-                } ?: println("cannot copy new bg image")
-            } catch (e: Exception) {
-                println("failed to copy new bg image")
-                e.printStackTrace()
-            }
+            backgroundImageRepo.loadAndOverwrite(uri)
+                .onSuccess { newTaggedUri ->
+                    backgroundImageUri.update { newTaggedUri }
+                }
         }
     }
 
@@ -227,7 +196,7 @@ class JustTextViewModel(
     }
 
     suspend fun saveDatastoreData() {
-        val uiState = _uiState.value
+        val uiState = uiState.value
         dataStore.edit { preferences ->
             uiState.textColor?.let { color ->
                 preferences[TEXT_COLOR_KEY] = color.toLong()
@@ -248,19 +217,10 @@ class JustTextViewModel(
     }
 
     fun saveTextToFile() {
-        try {
-            val text = _uiState.value.tfValue.text
-            applicationContext.openFileOutput(SAVED_TEXT_FILENAME, Context.MODE_PRIVATE).use {
-                it.write(text.toByteArray())
-            }
-            println("text saved (${text.length} characters)")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        textRepo.save(uiState.value.tfValue.text)
     }
 
     override fun onCleared() {
-        super.onCleared()
         stopPeriodicSave()
     }
 
@@ -274,9 +234,11 @@ class JustTextViewModel(
             ): T {
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
                 //val savedStateHandle = extras.createSavedStateHandle()
+                val applicationContext = application.applicationContext
                 return JustTextViewModel(
-                    application.applicationContext,
-                    application.dataStore,
+                    dataStore = application.dataStore,
+                    textRepo = TextRepo(applicationContext),
+                    backgroundImageRepo = BackgroundImageRepo(applicationContext),
                 ) as T
             }
         }
@@ -288,8 +250,5 @@ class JustTextViewModel(
         private val TEXT_COLOR_KEY = longPreferencesKey("text_color")
         private val TEXT_BACKGROUND_COLOR_KEY = longPreferencesKey("text_background_color")
         private val IMAGE_BACKGROUND_COLOR_KEY = longPreferencesKey("image_background_color")
-
-        private const val SAVED_TEXT_FILENAME = "saved-text.txt"
-        private const val BACKGROUND_IMAGE_FILENAME = "background-image.jpg"
     }
 }

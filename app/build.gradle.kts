@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material3.adaptive)
     implementation(libs.androidx.datastore)
+    implementation(libs.androidx.datastore.tink)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil)
     implementation(libs.colormath)
