@@ -2,7 +2,7 @@ package com.pierbezuhoff.justtext.data
 
 import android.content.Context
 
-class TextRepo(
+class TextFileRepo(
     private val applicationContext: Context,
 ) {
 

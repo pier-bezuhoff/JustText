@@ -62,6 +62,8 @@ dependencies {
     implementation(libs.androidx.datastore.tink)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.colormath)
     implementation(libs.colormath.compose)
     debugImplementation(libs.androidx.ui.tooling)

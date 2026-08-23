@@ -45,6 +45,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.TaggedUri
+import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
@@ -129,6 +130,12 @@ fun HomeScreenRoot(
         if (!uiState.loadedFromDisk) {
             viewModel.startLoadingData()
         }
+    }
+    LaunchedEffect(Unit) {
+        val textCloudRepo = TextCloudRepo()
+        textCloudRepo.setPassword("")
+        val r = textCloudRepo.pull()
+        println(r)
     }
 }
 

@@ -1,0 +1,93 @@
+package com.pierbezuhoff.justtext.data
+
+import android.accounts.NetworkErrorException
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.http.isSuccess
+
+private val ENCRYPTED_ENDPOINT_PACKAGE =
+    listOf(
+        15, 145, 5, 32, 248, 55, 101, 40, 14, 63, 165, 70, 56, 46, 151, 103,
+    ) + listOf(
+        208, 155, 157, 2, 39, 163, 175, 80, 2, 64, 151, 98,
+    ) + listOf(
+        176, 13, 167, 68, 144, 242, 7, 241, 196, 250, 252, 194, 51, 138,
+        102, 89, 179, 192, 229, 212, 207, 162, 223, 168, 136, 61, 189, 249,
+        19, 164, 177, 93, 102, 135, 142, 146, 169, 38, 88, 137, 58, 63, 29,
+        112, 1, 135, 67, 250, 97, 253, 89, 214, 130, 43, 71, 15, 96, 196,
+        243, 242, 84, 149, 23, 118, 202, 173, 226, 37, 12, 138, 28, 128,
+        152, 53, 28, 38, 156, 129, 80, 231, 37, 82, 29, 221, 230, 31, 113,
+        39, 123, 27, 87, 44, 175, 148, 96, 230, 198, 171, 47, 224, 59, 254,
+        204, 146, 177, 5, 151, 255, 44, 28, 154, 48, 171, 219, 26, 94, 20,
+        168, 97, 132, 81, 56, 173, 152, 223, 37, 150, 39, 53, 70, 193, 208,
+        72, 183, 32, 1, 101, 108, 21, 74, 239, 150, 234, 29, 181, 25, 174,
+        63, 107, 108, 43, 243, 218, 124, 95, 202, 77, 72, 195, 9, 152, 119,
+        245, 128, 198, 173, 169, 196, 12, 50, 211, 255, 165,
+    )
+
+class TextCloudRepo() {
+    private var endpoint: String? = null
+    private var password: String? = null
+
+    private val client = HttpClient()
+
+    fun setEndpoint(url: String) {
+        endpoint = url
+    }
+
+    fun setPassword(pwd: String) {
+        password = pwd
+    }
+
+    private suspend fun get(): Result<ByteArray> {
+        val url = endpoint
+        require(url != null)
+        client.use {
+            val response = client.get(url)
+            return response.asResult()
+        }
+    }
+
+    private suspend fun post(text: String): Result<Unit> {
+        val url = endpoint
+        require(url != null)
+        client.use {
+            val response = client.post(url) {
+                setBody(text)
+            }
+            return if (response.status.isSuccess())
+                Result.success(Unit)
+            else
+                Result.failure(NetworkErrorException("Status: ${response.status} from $response"))
+        }
+    }
+
+    suspend fun pull(): Result<String> {
+        val pwd = password
+        if (pwd != null) {
+            endpoint = TextEncryption.decryptWithPassword(
+                ENCRYPTED_ENDPOINT_PACKAGE.map { it.toByte() }.toByteArray(),
+                pwd
+            )
+                .also { println("endpoint := $it") }
+        }
+        if (endpoint == null || pwd == null)
+            return Result.failure(IllegalStateException("no endpoint/password"))
+        val result = get().mapCatching { encryptedPackage ->
+            println(encryptedPackage.contentToString())
+            TextEncryption.decryptWithPassword(encryptedPackage, pwd)
+        }
+        return result
+    }
+
+}
+
+private suspend fun HttpResponse.asResult(): Result<ByteArray> =
+    if (status.isSuccess())
+        Result.success(bodyAsBytes())
+    else
+        Result.failure(NetworkErrorException("Status: $status from $this"))

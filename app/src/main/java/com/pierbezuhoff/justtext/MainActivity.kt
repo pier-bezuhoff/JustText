@@ -22,7 +22,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             JustTextTheme(
                 colorTheme = ColorTheme.Auto
-//                colorTheme = ColorTheme.Dark
             ) {
                 HomeScreenRoot(
                     viewModel = viewModel,

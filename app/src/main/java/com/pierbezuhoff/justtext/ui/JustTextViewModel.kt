@@ -15,7 +15,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.data.BackgroundImageRepo
 import com.pierbezuhoff.justtext.data.TaggedUri
-import com.pierbezuhoff.justtext.data.TextRepo
+import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,7 +35,7 @@ import kotlin.time.Duration.Companion.minutes
 //  so the important elements of UiState are saved via dataStore
 class JustTextViewModel(
     private val dataStore: DataStore<Preferences>,
-    private val textRepo: TextRepo,
+    private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : ViewModel() {
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
@@ -61,7 +61,7 @@ class JustTextViewModel(
     }
 
     private fun loadInitialTextFromFile() {
-        textRepo.load()
+        textFileRepo.load()
             .onSuccess { text ->
                 uiState.update {
                     it.copy(
@@ -217,7 +217,7 @@ class JustTextViewModel(
     }
 
     fun saveTextToFile() {
-        textRepo.save(uiState.value.tfValue.text)
+        textFileRepo.save(uiState.value.tfValue.text)
     }
 
     override fun onCleared() {
@@ -237,7 +237,7 @@ class JustTextViewModel(
                 val applicationContext = application.applicationContext
                 return JustTextViewModel(
                     dataStore = application.dataStore,
-                    textRepo = TextRepo(applicationContext),
+                    textFileRepo = TextFileRepo(applicationContext),
                     backgroundImageRepo = BackgroundImageRepo(applicationContext),
                 ) as T
             }
