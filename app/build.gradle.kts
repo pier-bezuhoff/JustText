@@ -44,28 +44,42 @@ android {
         // otherwise linter crashes during signed release build...
         disable += "NullSafeMutableLiveData"
     }
+    packaging {
+        resources.pickFirsts.add("META-INF/INDEX.LIST")
+    }
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.core.splashScreen) // splash screen backport
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material3.adaptive)
-    implementation(libs.androidx.datastore)
-    implementation(libs.androidx.datastore.tink)
-    implementation(libs.kotlinx.serialization.json)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.ui)
+    implementation(libs.ui.graphics)
+    implementation(libs.ui.tooling.preview)
+    implementation(libs.material3)
+    implementation(libs.material3.adaptive)
+    implementation(libs.activity.compose)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.core.ktx)
+    implementation(libs.core.splashScreen) // splash screen backport
+    implementation(libs.datastore)
+    implementation(libs.datastore.tink)
+    implementation(libs.serialization.json)
     implementation(libs.coil)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.logging)
     implementation(libs.colormath)
     implementation(libs.colormath.compose)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(libs.slf4j.api)
+    implementation(libs.logback)
+    debugImplementation(libs.ui.tooling)
+    debugImplementation(libs.ui.test.manifest)
+    testImplementation(libs.kotest.junit5)
+    testImplementation(libs.kotest.assertion.core)
+    testImplementation(libs.kotest.property)
 }

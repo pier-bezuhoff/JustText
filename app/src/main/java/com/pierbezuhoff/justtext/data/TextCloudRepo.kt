@@ -1,20 +1,25 @@
 package com.pierbezuhoff.justtext.data
 
 import android.accounts.NetworkErrorException
+import com.pierbezuhoff.justtext.byteArrayOf
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.logging.ANDROID
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.isSuccess
+import kotlin.io.encoding.Base64
 
 private val ENCRYPTED_ENDPOINT_PACKAGE =
-    listOf(
+    byteArrayOf(
         15, 145, 5, 32, 248, 55, 101, 40, 14, 63, 165, 70, 56, 46, 151, 103,
-    ) + listOf(
+    ) + byteArrayOf(
         208, 155, 157, 2, 39, 163, 175, 80, 2, 64, 151, 98,
-    ) + listOf(
+    ) + byteArrayOf(
         176, 13, 167, 68, 144, 242, 7, 241, 196, 250, 252, 194, 51, 138,
         102, 89, 179, 192, 229, 212, 207, 162, 223, 168, 136, 61, 189, 249,
         19, 164, 177, 93, 102, 135, 142, 146, 169, 38, 88, 137, 58, 63, 29,
@@ -33,7 +38,12 @@ class TextCloudRepo() {
     private var endpoint: String? = null
     private var password: String? = null
 
-    private val client = HttpClient()
+    private val client = HttpClient() {
+        install(Logging) {
+            logger = Logger.ANDROID
+            level = LogLevel.HEADERS
+        }
+    }
 
     fun setEndpoint(url: String) {
         endpoint = url
@@ -46,48 +56,53 @@ class TextCloudRepo() {
     private suspend fun get(): Result<ByteArray> {
         val url = endpoint
         require(url != null)
-        client.use {
-            val response = client.get(url)
-            return response.asResult()
+        return runCatching {
+            client.use {
+                client.get(url)
+            }
+        }.mapCatching { response ->
+            println(response)
+            if (response.status.isSuccess())
+                response.bodyAsBytes()
+            else
+                throw NetworkErrorException("Status: ${response.status} from $this")
         }
     }
 
     private suspend fun post(text: String): Result<Unit> {
         val url = endpoint
         require(url != null)
-        client.use {
-            val response = client.post(url) {
-                setBody(text)
+        return runCatching {
+            client.use {
+                client.post(url) {
+                    setBody(text)
+                }
             }
-            return if (response.status.isSuccess())
-                Result.success(Unit)
+        }.mapCatching { response ->
+            if (response.status.isSuccess())
+                Unit
             else
-                Result.failure(NetworkErrorException("Status: ${response.status} from $response"))
+                throw NetworkErrorException("Status: ${response.status} from $response")
         }
     }
 
     suspend fun pull(): Result<String> {
         val pwd = password
         if (pwd != null) {
-            endpoint = TextEncryption.decryptWithPassword(
-                ENCRYPTED_ENDPOINT_PACKAGE.map { it.toByte() }.toByteArray(),
-                pwd
-            )
-                .also { println("endpoint := $it") }
+            runCatching {
+                endpoint = TextEncryption.decryptWithPassword(
+                    ENCRYPTED_ENDPOINT_PACKAGE,
+                    pwd
+                )
+            }
         }
         if (endpoint == null || pwd == null)
             return Result.failure(IllegalStateException("no endpoint/password"))
-        val result = get().mapCatching { encryptedPackage ->
-            println(encryptedPackage.contentToString())
+        val result = get().mapCatching { base64 ->
+            val encryptedPackage = Base64.decode(base64)
             TextEncryption.decryptWithPassword(encryptedPackage, pwd)
         }
         return result
     }
 
 }
-
-private suspend fun HttpResponse.asResult(): Result<ByteArray> =
-    if (status.isSuccess())
-        Result.success(bodyAsBytes())
-    else
-        Result.failure(NetworkErrorException("Status: $status from $this"))

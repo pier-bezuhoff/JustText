@@ -4,7 +4,9 @@ import androidx.compose.runtime.Immutable
 
 @Immutable
 sealed interface TextSource {
-    object LocalFile : TextSource
+    data object LocalFile : TextSource
 
-    object CloudFile : TextSource
+    data class CloudFile(
+        val endpoint: String,
+    ) : TextSource
 }

@@ -51,6 +51,8 @@ import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 // MAYBE: add quick in-text search button
 @Suppress("ParamsComparedByRef")
@@ -130,12 +132,6 @@ fun HomeScreenRoot(
         if (!uiState.loadedFromDisk) {
             viewModel.startLoadingData()
         }
-    }
-    LaunchedEffect(Unit) {
-        val textCloudRepo = TextCloudRepo()
-        textCloudRepo.setPassword("")
-        val r = textCloudRepo.pull()
-        println(r)
     }
 }
 

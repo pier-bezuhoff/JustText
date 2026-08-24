@@ -15,6 +15,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.data.BackgroundImageRepo
 import com.pierbezuhoff.justtext.data.TaggedUri
+import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,12 @@ class JustTextViewModel(
             uiState.update { it.copy(loadedFromDisk = true) }
             println("ViewModel loaded persistent data")
             startPeriodicSave()
+
+            val textCloudRepo = TextCloudRepo()
+            launch(Dispatchers.IO) {
+                val r = textCloudRepo.pull()
+                println(r)
+            }
         }
     }
 
