@@ -61,25 +61,27 @@ fun TextScreen(
         modifier = modifier
             .padding(start = startPadding, end = endPadding)
             .appendTextContextMenuComponents {
-                separator()
-                item(DeleteSelectionKey, "Delete") {
-                    // NOTE: when selection is auto-expanded (eg after selecting a phone-like number)
-                    //  (see ComposeFoundationFlags.isSmartSelectionEnabled)
-                    //  tfValue.selection points to the initial, smaller selection
-                    //  so it Deletes only it (built-in Cut works somehow)
-                    //  built-in Cut is defined as
-                    //  `textFieldState.deleteSelectedText()` + add result to clipboard
+                if (!readOnly) {
+                    separator()
+                    item(DeleteSelectionKey, "Delete") {
+                        // NOTE: when selection is auto-expanded (eg after selecting a phone-like number)
+                        //  (see ComposeFoundationFlags.isSmartSelectionEnabled)
+                        //  tfValue.selection points to the initial, smaller selection
+                        //  so it Deletes only it (built-in Cut works somehow)
+                        //  built-in Cut is defined as
+                        //  `textFieldState.deleteSelectedText()` + add result to clipboard
 //                    println("Delete context-action ${tfValue.selection} / comp ${tfValue.composition}")
-                    val range = tfValue.selection
-                    val text = tfValue.text
-                    val newText = text.removeRange(range.min, range.max)
-                    setTFValue(
-                        TextFieldValue(
-                            text = newText,
-                            selection = TextRange(range.min)
+                        val range = tfValue.selection
+                        val text = tfValue.text
+                        val newText = text.removeRange(range.min, range.max)
+                        setTFValue(
+                            TextFieldValue(
+                                text = newText,
+                                selection = TextRange(range.min)
+                            )
                         )
-                    )
-                    close()
+                        close()
+                    }
                 }
             }
         ,

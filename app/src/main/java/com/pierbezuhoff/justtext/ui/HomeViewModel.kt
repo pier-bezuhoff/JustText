@@ -6,6 +6,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -14,17 +15,23 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.pierbezuhoff.justtext.data.BackgroundImageRepo
+import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
+import com.pierbezuhoff.justtext.encryptedDataStore
+import com.pierbezuhoff.justtext.stateInWhileSubscribed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -34,8 +41,9 @@ import kotlin.time.Duration.Companion.minutes
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via dataStore
-class JustTextViewModel(
+class HomeViewModel(
     private val dataStore: DataStore<Preferences>,
+    private val encryptedDataStore: DataStore<EncryptedData>,
     private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : ViewModel() {
@@ -46,35 +54,46 @@ class JustTextViewModel(
     val backgroundImageUri: StateFlow<TaggedUri?>
         field = MutableStateFlow<TaggedUri?>(null)
 
+    val encryptedDataFlow: Flow<EncryptedData> = encryptedDataStore.data
+
+    private val textCloudRepo = MutableStateFlow<TextCloudRepo?>(null)
+
     private val periodicSaveIsOn = MutableStateFlow(false)
     private var periodicSaveJob: Job? = null
 
-    fun startLoadingData() {
+    init {
         viewModelScope.launch {
-            loadInitialTextFromFile()
             loadBackgroundImageFromFile()
             loadDataStoreData()
-            markSaved()
-            uiState.update { it.copy(loadedFromDisk = true) }
+            loadEncryptedDataStoreData()
+            if (uiState.value.isLocal)
+                loadTextFromFile()
+            else
+                loadTextFromCloud()
             println("ViewModel loaded persistent data")
             startPeriodicSave()
-
-            val textCloudRepo = TextCloudRepo()
-            launch(Dispatchers.IO) {
-                val r = textCloudRepo.pull()
-                println(r)
-            }
         }
     }
 
-    private fun loadInitialTextFromFile() {
+    private fun loadTextFromFile() {
         textFileRepo.load()
             .onSuccess { text ->
-                uiState.update {
-                    it.copy(
-                        tfValue = TextFieldValue(text, TextRange(text.length))
-                    )
-                }
+                uiState.update { it.copy(
+                    isLocal = true,
+                    contentStatus = ContentStatus.SYNCED,
+                    tfValue = TextFieldValue(text, TextRange(text.length)),
+                ) }
+            }
+    }
+
+    private suspend fun loadTextFromCloud() {
+        textCloudRepo.value?.pull()
+            ?.onSuccess { text ->
+                uiState.update { it.copy(
+                    isLocal = false,
+                    contentStatus = ContentStatus.SYNCED,
+                    tfValue = TextFieldValue(text, TextRange(text.length)),
+                ) }
             }
     }
 
@@ -88,8 +107,10 @@ class JustTextViewModel(
             val textColor = data[TEXT_COLOR_KEY]?.toULong()
             val cursorLocation = data[CURSOR_LOCATION_KEY]
             val fontSize = data[FONT_SIZE_KEY]
+            val isLocal = data[IS_LOCAL_KEY]
             uiState.update { state ->
                 state.copy(
+                    isLocal = isLocal ?: true,
                     tfValue = if (cursorLocation == null) {
                         state.tfValue
                     } else {
@@ -106,6 +127,17 @@ class JustTextViewModel(
         }
     }
 
+    private suspend fun loadEncryptedDataStoreData() {
+        encryptedDataStore.data.firstOrNull()?.let { data ->
+            val (endpoint, password) = data
+            if (endpoint != null && password != null) {
+                textCloudRepo.update {
+                    TextCloudRepo(endpoint, password)
+                }
+            }
+        }
+    }
+
     private fun loadBackgroundImageFromFile() {
         backgroundImageRepo.load().getOrNull()?.let { newImage ->
             backgroundImageUri.update { newImage }
@@ -113,21 +145,37 @@ class JustTextViewModel(
     }
 
     private fun markSaved() {
-        uiState.update { it.copy(syncedToDisk = true) }
+        uiState.update { it.copy(
+            contentStatus = ContentStatus.SYNCED
+        ) }
     }
 
     private fun markUnsaved() {
-        uiState.update { it.copy(syncedToDisk = false) }
+        uiState.update { it.copy(
+            contentStatus = ContentStatus.UNSAVED
+        ) }
     }
 
     fun save() {
-        viewModelScope.launch {
-            saveDatastoreData()
-            withContext(Dispatchers.IO) {
-                saveTextToFile()
+        if (uiState.value.contentStatus != ContentStatus.LOADING) {
+            viewModelScope.launch {
+                saveDatastoreData()
+                withContext(Dispatchers.IO) {
+                    val saveResult =
+                        if (uiState.value.isLocal) {
+                            saveTextToFile()
+                        } else {
+                            saveTextToCloud()
+                        }
+                    saveResult.onSuccess {
+                        markSaved()
+                        println("saved.")
+                    }.onFailure {
+                        it.printStackTrace()
+                        println("saving failed")
+                    }
+                }
             }
-            markSaved()
-            println("saved.")
         }
     }
 
@@ -194,15 +242,63 @@ class JustTextViewModel(
         }
     }
 
+    // second switch to cloud fails with
+    // [DefaultDispatch] HttpClient REQUEST failed with exception: kotlinx.coroutines.JobCancellationException: Parent job is Completed; job=SupervisorJobImpl{Completed}@3fa7085
+    fun switchTextSource() {
+        if (uiState.value.isLocal) {
+            if (textCloudRepo.value != null) {
+                uiState.update { it.copy(
+                    contentStatus = ContentStatus.SAVING,
+                ) }
+                viewModelScope.launch(Dispatchers.IO) {
+                    saveTextToFile()
+                    uiState.update { it.copy(
+                        contentStatus = ContentStatus.LOADING,
+                    ) }
+                    loadTextFromCloud()
+                }
+            } else {
+                println("no cloud repo")
+            }
+        } else {
+            uiState.update { it.copy(
+                contentStatus = ContentStatus.SAVING,
+            ) }
+            viewModelScope.launch(Dispatchers.IO) {
+                saveTextToCloud()
+                uiState.update { it.copy(
+                    contentStatus = ContentStatus.LOADING,
+                ) }
+                loadTextFromFile()
+            }
+        }
+    }
+
+    fun setCloudRepoProperties(properties: TextCloudRepo.Properties) {
+        textCloudRepo.update { TextCloudRepo(properties) }
+        viewModelScope.launch {
+            encryptedDataStore.updateData { it.copy(
+                noteEndpoint = properties.endpoint,
+                notePassword = properties.password,
+            ) }
+        }
+    }
+
     fun persistState() {
-        saveTextToFile()
+        if (uiState.value.isLocal) {
+            saveTextToFile()
+        } else {
+            runBlocking {
+                saveTextToCloud()
+            }
+        }
         runBlocking {
             saveDatastoreData()
         }
         markSaved()
     }
 
-    suspend fun saveDatastoreData() {
+    private suspend fun saveDatastoreData() {
         val uiState = uiState.value
         dataStore.edit { preferences ->
             uiState.textColor?.let { color ->
@@ -220,12 +316,23 @@ class JustTextViewModel(
             uiState.fontSize.let { fontSize ->
                 preferences[FONT_SIZE_KEY] = fontSize
             }
+            uiState.isLocal.let { isLocal ->
+                preferences[IS_LOCAL_KEY] = isLocal
+            }
         }
     }
 
-    fun saveTextToFile() {
+    private fun saveTextToFile(): Result<Unit> =
         textFileRepo.save(uiState.value.tfValue.text)
-    }
+
+    private suspend fun saveTextToCloud(): Result<Unit> =
+        runCatching {
+            textCloudRepo.value?.push(uiState.value.tfValue.text)
+        }.mapCatching {
+            if (it == null)
+                throw Error("No cloud repo")
+            else Unit
+        }
 
     override fun onCleared() {
         stopPeriodicSave()
@@ -242,8 +349,9 @@ class JustTextViewModel(
                 val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
                 //val savedStateHandle = extras.createSavedStateHandle()
                 val applicationContext = application.applicationContext
-                return JustTextViewModel(
+                return HomeViewModel(
                     dataStore = application.dataStore,
+                    encryptedDataStore = application.encryptedDataStore,
                     textFileRepo = TextFileRepo(applicationContext),
                     backgroundImageRepo = BackgroundImageRepo(applicationContext),
                 ) as T
@@ -257,5 +365,6 @@ class JustTextViewModel(
         private val TEXT_COLOR_KEY = longPreferencesKey("text_color")
         private val TEXT_BACKGROUND_COLOR_KEY = longPreferencesKey("text_background_color")
         private val IMAGE_BACKGROUND_COLOR_KEY = longPreferencesKey("image_background_color")
+        private val IS_LOCAL_KEY = booleanPreferencesKey("is_local")
     }
 }

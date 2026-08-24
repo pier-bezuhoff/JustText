@@ -7,13 +7,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pierbezuhoff.justtext.ui.HomeScreenRoot
-import com.pierbezuhoff.justtext.ui.JustTextViewModel
+import com.pierbezuhoff.justtext.ui.HomeViewModel
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: JustTextViewModel by viewModels { JustTextViewModel.Factory }
+    private val viewModel: HomeViewModel by viewModels { HomeViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()

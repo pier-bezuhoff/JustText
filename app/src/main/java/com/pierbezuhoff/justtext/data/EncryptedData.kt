@@ -2,8 +2,6 @@ package com.pierbezuhoff.justtext.data
 
 import androidx.compose.runtime.Immutable
 import androidx.datastore.core.Serializer
-import androidx.datastore.tink.AeadSerializer
-import com.google.crypto.tink.KeysetHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable

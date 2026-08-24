@@ -1,6 +1,7 @@
 package com.pierbezuhoff.justtext.data
 
 import android.accounts.NetworkErrorException
+import androidx.compose.runtime.Immutable
 import com.pierbezuhoff.justtext.byteArrayOf
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.logging.ANDROID
@@ -12,9 +13,12 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import kotlin.io.encoding.Base64
 
-private val ENCRYPTED_ENDPOINT_PACKAGE =
+val ENCRYPTED_ENDPOINT_PACKAGE =
     byteArrayOf(
         15, 145, 5, 32, 248, 55, 101, 40, 14, 63, 165, 70, 56, 46, 151, 103,
     ) + byteArrayOf(
@@ -34,9 +38,19 @@ private val ENCRYPTED_ENDPOINT_PACKAGE =
         245, 128, 198, 173, 169, 196, 12, 50, 211, 255, 165,
     )
 
-class TextCloudRepo() {
-    private var endpoint: String? = null
-    private var password: String? = null
+class TextCloudRepo(
+    private val endpoint: String,
+    private val password: String,
+) {
+    @Immutable
+    data class Properties(
+        val endpoint: String,
+        val password: String,
+    )
+
+    constructor(properties: Properties) : this(
+        properties.endpoint, properties.password
+    )
 
     private val client = HttpClient() {
         install(Logging) {
@@ -45,20 +59,10 @@ class TextCloudRepo() {
         }
     }
 
-    fun setEndpoint(url: String) {
-        endpoint = url
-    }
-
-    fun setPassword(pwd: String) {
-        password = pwd
-    }
-
     private suspend fun get(): Result<ByteArray> {
-        val url = endpoint
-        require(url != null)
         return runCatching {
             client.use {
-                client.get(url)
+                client.get(endpoint)
             }
         }.mapCatching { response ->
             println(response)
@@ -70,11 +74,9 @@ class TextCloudRepo() {
     }
 
     private suspend fun post(text: String): Result<Unit> {
-        val url = endpoint
-        require(url != null)
         return runCatching {
             client.use {
-                client.post(url) {
+                client.post(endpoint) {
                     setBody(text)
                 }
             }
@@ -86,23 +88,19 @@ class TextCloudRepo() {
         }
     }
 
-    suspend fun pull(): Result<String> {
-        val pwd = password
-        if (pwd != null) {
-            runCatching {
-                endpoint = TextEncryption.decryptWithPassword(
-                    ENCRYPTED_ENDPOINT_PACKAGE,
-                    pwd
-                )
-            }
-        }
-        if (endpoint == null || pwd == null)
-            return Result.failure(IllegalStateException("no endpoint/password"))
+    suspend fun pull(): Result<String> = withContext(Dispatchers.IO) {
         val result = get().mapCatching { base64 ->
+//            yield()
             val encryptedPackage = Base64.decode(base64)
-            TextEncryption.decryptWithPassword(encryptedPackage, pwd)
+//            yield()
+            TextEncryption.decryptWithPassword(encryptedPackage, password)
         }
-        return result
+        result
+    }
+
+    suspend fun push(text: String): Result<Unit> {
+//        return post(text)
+        return Result.success(Unit)
     }
 
 }

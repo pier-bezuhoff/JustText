@@ -3,47 +3,92 @@ package com.pierbezuhoff.justtext.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.pierbezuhoff.justtext.R
+import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
@@ -51,14 +96,12 @@ import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 // MAYBE: add quick in-text search button
 @Suppress("ParamsComparedByRef")
 @Composable
 fun HomeScreenRoot(
-    viewModel: JustTextViewModel,
+    viewModel: HomeViewModel,
     quitApp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,16 +114,22 @@ fun HomeScreenRoot(
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
+    val encryptedData by viewModel.encryptedDataFlow.collectAsStateWithLifecycle(EncryptedData())
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
+    val snackbar = remember { SnackbarHostState() }
     HomeScreen(
         uiState = uiState,
         backgroundImageUri = backgroundImageUri,
+        encryptedData = encryptedData,
         modifier = modifier,
+        snackbarHostState = snackbar,
         quitApp = {
             viewModel.persistState()
             quitApp()
         },
         save = viewModel::save,
+        switchTextSource = viewModel::switchTextSource,
+        setCloudRepoProperties = viewModel::setCloudRepoProperties,
         openFontSizeDialog = { openedDialogType = DialogType.FONT_SIZE },
         openColorsDialog = { openedDialogType = DialogType.COLORS },
         openBackgroundImagePicker = {
@@ -128,42 +177,45 @@ fun HomeScreenRoot(
         }
         null -> {}
     }
-    LaunchedEffect(viewModel) {
-        if (!uiState.loadedFromDisk) {
-            viewModel.startLoadingData()
-        }
-    }
 }
 
 @Composable
 fun HomeScreen(
     uiState: UiState,
     backgroundImageUri: TaggedUri?,
+    encryptedData: EncryptedData,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     quitApp: () -> Unit = {},
     save: () -> Unit = {},
+    switchTextSource: () -> Unit = {},
+    setCloudRepoProperties: (TextCloudRepo.Properties) -> Unit = {},
     openFontSizeDialog: () -> Unit = {},
     openColorsDialog: () -> Unit = {},
     openBackgroundImagePicker: () -> Unit = {},
     setTFValue: (TextFieldValue) -> Unit = {},
 ) {
-    val textColor = uiState.textColor?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
-    val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
-    val imageBackgroundColor = uiState.imageBackgroundColor?.let { Color(it) } ?: MaterialTheme.colorScheme.surface
     Scaffold(
         modifier = modifier,
         topBar = {
             TopBar(
-                syncedToDisk = uiState.syncedToDisk,
+                isLocal = uiState.isLocal,
+                contentStatus = uiState.contentStatus,
+                encryptedData = encryptedData,
                 quitApp = quitApp,
                 save = save,
+                switchTextSource = switchTextSource,
+                setCloudRepoProperties = setCloudRepoProperties,
                 openFontSizeDialog = openFontSizeDialog,
                 openColorsDialog = openColorsDialog,
                 openBackgroundImagePicker = openBackgroundImagePicker,
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent,
     ) { innerPadding ->
+        val imageBackgroundColor = uiState.imageBackgroundColor?.let { Color(it) }
+            ?: MaterialTheme.colorScheme.surface
         Box(
             Modifier
                 // this weird padding chemistry is needed to hide random white rect at the bottom
@@ -183,6 +235,8 @@ fun HomeScreen(
             // BUG: when keyboard appears, in its future place image overlays becomes
             //  bright alpha=0
             //  (seemingly only on older Android versions)
+            val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) }
+                ?: MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
             Surface(
                 modifier = Modifier
                     .padding(
@@ -198,11 +252,17 @@ fun HomeScreen(
                 ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
+                val textColor = uiState.textColor?.let { Color(it) }
+                    ?: MaterialTheme.colorScheme.primary
                 TextScreen(
                     tfValue = uiState.tfValue,
                     fontSize = uiState.fontSize,
                     textColor = textColor,
-                    readOnly = !uiState.loadedFromDisk,
+                    readOnly = when (uiState.contentStatus) {
+                        ContentStatus.LOADING, ContentStatus.SAVING -> true
+                        ContentStatus.SYNCED, ContentStatus.UNSAVED -> false
+                    }
+                    ,
                     setTFValue = setTFValue,
                 )
             }
@@ -216,91 +276,14 @@ private fun HomeScreenPreview() {
     JustTextTheme(ColorTheme.Dark) {
         HomeScreen(
             uiState = UiState(
-                loadedFromDisk = true,
-                syncedToDisk = true,
+                contentStatus = ContentStatus.SYNCED,
                 tfValue = TextFieldValue("hi!!!!!"),
                 fontSize = 30,
             ),
             backgroundImageUri = null,
+            encryptedData = EncryptedData(),
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TopBar(
-    syncedToDisk: Boolean,
-    quitApp: () -> Unit = {},
-    save: () -> Unit = {},
-    openFontSizeDialog: () -> Unit = {},
-    openColorsDialog: () -> Unit = {},
-    openBackgroundImagePicker: () -> Unit = {},
-) {
-    TopAppBar(
-        navigationIcon = {
-            IconButton(
-                onClick = quitApp,
-            ) {
-                Icon(
-                    painterResource(R.drawable.close),
-                    "quit"
-                )
-            }
-        },
-        title = {
-            TextButton(
-                onClick = save,
-                modifier = Modifier.padding(horizontal = 12.dp),
-                enabled = !syncedToDisk,
-                colors = ButtonDefaults.textButtonColors().copy(
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        .copy(alpha = 0.5f)
-                    ,
-                )
-            ) {
-                Text(
-                    text =
-                        if (syncedToDisk)
-                            "Saved"
-                        else "Save"
-                    ,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            }
-        },
-        actions = {
-            IconButton(
-                onClick = openFontSizeDialog
-            ) {
-                Icon(
-                    painterResource(R.drawable.text_size),
-                    "choose font size"
-                )
-            }
-            IconButton(
-                onClick = openColorsDialog
-            ) {
-                Icon(
-                    painterResource(R.drawable.palette),
-                    "choose ui colors"
-                )
-            }
-            IconButton(
-                onClick = openBackgroundImagePicker
-            ) {
-                Icon(
-                    painterResource(R.drawable.background_image),
-                    "choose bg image"
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
-            navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
-    )
 }
 
 @Composable
@@ -321,5 +304,308 @@ private fun BackgroundImage(taggedUri: TaggedUri) {
             modifier = Modifier.fillMaxSize(),
             alpha = 1f,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TopBar(
+    isLocal: Boolean,
+    contentStatus: ContentStatus,
+    encryptedData: EncryptedData,
+    quitApp: () -> Unit = {},
+    save: () -> Unit = {},
+    switchTextSource: () -> Unit = {},
+    setCloudRepoProperties: (TextCloudRepo.Properties) -> Unit = {},
+    openFontSizeDialog: () -> Unit = {},
+    openColorsDialog: () -> Unit = {},
+    openBackgroundImagePicker: () -> Unit = {},
+) {
+    var showTextSourceProperitesPopup: Boolean by remember { mutableStateOf(false) }
+    TopAppBar(
+        navigationIcon = {
+            IconButton(onClick = quitApp) {
+                Icon(painterResource(R.drawable.power),
+                    "quit"
+                )
+            }
+        },
+        title = {
+            TextButton(
+                onClick = save,
+                modifier = Modifier.padding(horizontal = 12.dp),
+                enabled = contentStatus == ContentStatus.UNSAVED,
+                colors = ButtonDefaults.textButtonColors().copy(
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        .copy(alpha = 0.5f)
+                    ,
+                )
+            ) {
+                Text(
+                    text = when (contentStatus) {
+                        ContentStatus.LOADING -> "Loading"
+                        ContentStatus.SYNCED -> "Synced"
+                        ContentStatus.UNSAVED -> "Save"
+                        ContentStatus.SAVING -> "Saving"
+                    }
+                    ,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = openFontSizeDialog) {
+                Icon(painterResource(R.drawable.text_size),
+                    "choose font size"
+                )
+            }
+            IconButton(onClick = openColorsDialog) {
+                Icon(painterResource(R.drawable.palette),
+                    "choose ui colors"
+                )
+            }
+            IconButton(onClick = openBackgroundImagePicker) {
+                Icon(painterResource(R.drawable.background_image),
+                    "choose bg image"
+                )
+            }
+            Box {
+                SwitchTextSourceButton(
+                    isLocal = isLocal,
+                    switchTextSource = switchTextSource,
+                    openTextSourceProperties = {
+                        showTextSourceProperitesPopup = !showTextSourceProperitesPopup
+                    },
+                )
+                if (showTextSourceProperitesPopup) {
+                    TextSourcePropertiesPopup(
+                        initialEndpoint = encryptedData.noteEndpoint ?: "example.com",
+                        initialPassword = encryptedData.notePassword ?: "",
+                        dismiss = { showTextSourceProperitesPopup = false },
+                        setCloudRepoProperties = {
+                            setCloudRepoProperties(it)
+                            if (isLocal)
+                                switchTextSource()
+                        },
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+            navigationIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            actionIconContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    )
+}
+
+/** shows text source properties on long click */
+@Composable
+private fun SwitchTextSourceButton(
+    isLocal: Boolean,
+    modifier: Modifier = Modifier,
+    switchTextSource: () -> Unit = {},
+    openTextSourceProperties: () -> Unit = {},
+) {
+    IconButtonWithCombinedClickable (
+        modifier = modifier,
+        onClick = switchTextSource,
+        onLongClick = openTextSourceProperties,
+    ) {
+        Icon(
+            if (isLocal)
+                painterResource(R.drawable.cloud_download)
+            else
+                painterResource(R.drawable.no_internet)
+            ,
+            "switch text source"
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.TextSourcePropertiesPopup(
+    initialEndpoint: String,
+    initialPassword: String,
+    dismiss: () -> Unit = {},
+    setCloudRepoProperties: (TextCloudRepo.Properties) -> Unit = {},
+) {
+    var endpoint by remember { mutableStateOf(initialEndpoint) }
+    var password by remember { mutableStateOf(initialPassword) }
+    val confirm by rememberUpdatedState {
+        setCloudRepoProperties(
+            TextCloudRepo.Properties(endpoint, password)
+        )
+        dismiss()
+    }
+    Popup(
+        popupPositionProvider = object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize
+            ): IntOffset = IntOffset(
+                x = anchorBounds.center.x - popupContentSize.width/2,
+                y = anchorBounds.bottom + 20,
+            )
+        },
+        onDismissRequest = dismiss,
+        properties = PopupProperties(
+            focusable = true,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier.padding(8.dp),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 12.dp,
+            shadowElevation = 12.dp,
+        ) {
+            Column(
+                Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Endpoint")
+                    StringTextFieldWithConfirmOnEnter(
+                        value = endpoint,
+                        onValueChange = { endpoint = it },
+                        validateValue = { it.isNotBlank() },
+                        onConfirm = confirm,
+                        confirmOnEnter = true,
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Password")
+                    StringTextFieldWithConfirmOnEnter(
+                        value = password,
+                        onValueChange = { password = it },
+                        onConfirm = confirm,
+                        confirmOnEnter = true,
+                    )
+                }
+                IconButton(
+                    onClick = confirm,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                ) {
+                    Icon(painterResource(R.drawable.confirm), "ok")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StringTextFieldWithConfirmOnEnter(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    validateValue: (String) -> Boolean = { true },
+    onConfirm: () -> Unit = {},
+    color: Color = MaterialTheme.colorScheme.primary,
+    @StringRes
+    placeholderStringResource: Int? = null,
+    captureFocus: Boolean = false,
+    confirmOnEnter: Boolean = false,
+) {
+    var textFieldValue by remember {
+        mutableStateOf(TextFieldValue(value, TextRange(value.length)))
+    }
+    val focusRequester = remember { FocusRequester() }
+    OutlinedTextField(
+        value = textFieldValue,
+        onValueChange = { newTextFieldValue ->
+            textFieldValue = newTextFieldValue
+            val s = newTextFieldValue.text
+            if (s != value && validateValue(s)) {
+                onValueChange(s)
+            }
+        },
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .then(
+                if (confirmOnEnter)
+                    Modifier.onKeyEvent { keyEvent ->
+                        if (keyEvent.key == Key.Enter) {
+                            onConfirm()
+                            true
+                        } else false
+                    }
+                else Modifier
+            )
+        ,
+        textStyle = MaterialTheme.typography.bodyMedium,
+        placeholder = placeholderStringResource?.let {
+            { Text(stringResource(placeholderStringResource)) }
+        },
+        isError = !validateValue(textFieldValue.text),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Text,
+            imeAction = if (confirmOnEnter) ImeAction.Done else ImeAction.Unspecified,
+            showKeyboardOnFocus = true,
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = { onConfirm() }
+        ),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            cursorColor = color,
+            focusedLabelColor = color,
+            focusedBorderColor = color,
+            selectionColors = TextSelectionColors(
+                color,
+                color.copy(alpha = 0.4f),
+            )
+        ),
+    )
+    LaunchedEffect(focusRequester, captureFocus) {
+        if (captureFocus) {
+            focusRequester.requestFocus(FocusDirection.Enter)
+        }
+    }
+}
+
+@Composable
+private fun IconButtonWithCombinedClickable(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {},
+    colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
+    interactionSource: MutableInteractionSource? = null,
+    shape: Shape = IconButtonDefaults.standardShape,
+    content: @Composable () -> Unit,
+) {
+    val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
+    // always enabled
+    Box(
+        modifier =
+            modifier
+                .minimumInteractiveComponentSize()
+                .size(40.dp)
+                .clip(shape)
+                .background(color = colors.containerColor, shape = shape)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(),
+                    enabled = true,
+                    role = Role.Button,
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                )
+        ,
+        contentAlignment = Alignment.Center,
+    ) {
+        val contentColor = colors.contentColor
+        CompositionLocalProvider(LocalContentColor provides contentColor, content = content)
     }
 }
