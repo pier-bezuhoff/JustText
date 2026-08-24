@@ -21,17 +21,14 @@ import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import com.pierbezuhoff.justtext.encryptedDataStore
-import com.pierbezuhoff.justtext.stateInWhileSubscribed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -64,12 +61,13 @@ class HomeViewModel(
     init {
         viewModelScope.launch {
             loadBackgroundImageFromFile()
-            loadDataStoreData()
+            loadDataStoreData() // sets isLocal
             loadEncryptedDataStoreData()
             if (uiState.value.isLocal)
                 loadTextFromFile()
             else
                 loadTextFromCloud()
+            loadDataStoreData() // updates cursor location
             println("ViewModel loaded persistent data")
             startPeriodicSave()
         }
@@ -83,6 +81,10 @@ class HomeViewModel(
                     contentStatus = ContentStatus.SYNCED,
                     tfValue = TextFieldValue(text, TextRange(text.length)),
                 ) }
+            }.onFailure {
+                uiState.update { it.copy(
+                    contentStatus = ContentStatus.LOADING_FAILED
+                ) }
             }
     }
 
@@ -94,6 +96,12 @@ class HomeViewModel(
                     contentStatus = ContentStatus.SYNCED,
                     tfValue = TextFieldValue(text, TextRange(text.length)),
                 ) }
+            }.also { savingResult ->
+                if (savingResult?.isSuccess != true) {
+                    uiState.update { it.copy(
+                        contentStatus = ContentStatus.LOADING_FAILED
+                    ) }
+                }
             }
     }
 
@@ -154,52 +162,6 @@ class HomeViewModel(
         uiState.update { it.copy(
             contentStatus = ContentStatus.UNSAVED
         ) }
-    }
-
-    fun save() {
-        if (uiState.value.contentStatus != ContentStatus.LOADING) {
-            viewModelScope.launch {
-                saveDatastoreData()
-                withContext(Dispatchers.IO) {
-                    val saveResult =
-                        if (uiState.value.isLocal) {
-                            saveTextToFile()
-                        } else {
-                            saveTextToCloud()
-                        }
-                    saveResult.onSuccess {
-                        markSaved()
-                        println("saved.")
-                    }.onFailure {
-                        it.printStackTrace()
-                        println("saving failed")
-                    }
-                }
-            }
-        }
-    }
-
-    private fun startPeriodicSave() {
-        if (!periodicSaveIsOn.value) {
-            periodicSaveIsOn.update { true }
-            periodicSaveJob = viewModelScope.launch(Dispatchers.Default) {
-                flow {
-                    while (true) {
-                        emit(Unit)
-                        delay(PERIODIC_SAVE_DELAY)
-                    }
-                }
-                    .collect {
-                        println("periodic save")
-                        save()
-                    }
-            }
-        }
-    }
-
-    fun stopPeriodicSave() {
-        periodicSaveJob?.cancel()
-        periodicSaveIsOn.update { false }
     }
 
     fun setFontSize(fontSize: Int) {
@@ -284,8 +246,57 @@ class HomeViewModel(
         }
     }
 
+    fun save() {
+        if (uiState.value.contentStatus != ContentStatus.LOADING) {
+            viewModelScope.launch {
+                saveDatastoreData()
+                withContext(Dispatchers.IO) {
+                    val saveResult =
+                        if (uiState.value.isLocal) {
+                            saveTextToFile()
+                        } else {
+                            saveTextToCloud()
+                        }
+                    saveResult.onSuccess {
+                        markSaved()
+                        println("saved.")
+                    }.onFailure { e ->
+                        uiState.update { it.copy(
+                            contentStatus = ContentStatus.SAVING_FAILED
+                        ) }
+                        e.printStackTrace()
+                        println("saving failed")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startPeriodicSave() {
+        if (!periodicSaveIsOn.value) {
+            periodicSaveIsOn.update { true }
+            periodicSaveJob = viewModelScope.launch(Dispatchers.Default) {
+                flow {
+                    while (true) {
+                        emit(Unit)
+                        delay(PERIODIC_SAVE_DELAY)
+                    }
+                }
+                    .collect {
+                        println("periodic save")
+                        save()
+                    }
+            }
+        }
+    }
+
+    fun stopPeriodicSave() {
+        periodicSaveJob?.cancel()
+        periodicSaveIsOn.update { false }
+    }
+
     fun persistState() {
-        if (uiState.value.isLocal) {
+        val saveResult = if (uiState.value.isLocal) {
             saveTextToFile()
         } else {
             runBlocking {
@@ -295,7 +306,13 @@ class HomeViewModel(
         runBlocking {
             saveDatastoreData()
         }
-        markSaved()
+        saveResult.onSuccess {
+            markSaved()
+        }.onFailure {
+            uiState.update { it.copy(
+                contentStatus = ContentStatus.SAVING_FAILED
+            ) }
+        }
     }
 
     private suspend fun saveDatastoreData() {

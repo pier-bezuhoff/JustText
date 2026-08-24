@@ -260,7 +260,7 @@ fun HomeScreen(
                     textColor = textColor,
                     readOnly = when (uiState.contentStatus) {
                         ContentStatus.LOADING, ContentStatus.SAVING -> true
-                        ContentStatus.SYNCED, ContentStatus.UNSAVED -> false
+                        else -> false
                     }
                     ,
                     setTFValue = setTFValue,
@@ -344,10 +344,12 @@ private fun TopBar(
             ) {
                 Text(
                     text = when (contentStatus) {
-                        ContentStatus.LOADING -> "Loading"
+                        ContentStatus.LOADING -> "Loading..."
+                        ContentStatus.LOADING_FAILED -> "Loading failed."
                         ContentStatus.SYNCED -> "Synced"
                         ContentStatus.UNSAVED -> "Save"
-                        ContentStatus.SAVING -> "Saving"
+                        ContentStatus.SAVING -> "Saving..."
+                        ContentStatus.SAVING_FAILED -> "Saving failed."
                     }
                     ,
                     style = MaterialTheme.typography.headlineSmall

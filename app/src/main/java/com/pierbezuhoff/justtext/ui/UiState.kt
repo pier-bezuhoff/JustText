@@ -8,9 +8,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 data class UiState(
     val contentStatus: ContentStatus = ContentStatus.LOADING,
     val isLocal: Boolean = true,
-    val showTextSourcePropertiesPopup: Boolean = false,
     val tfValue: TextFieldValue =
-        TextFieldValue(DEFAULT_TEXT, TextRange(DEFAULT_TEXT.length)),
+        TextFieldValue(DEFAULT_TEXT, TextRange(0)),
     /** main body text font size in `sp` */
     val fontSize: Int = 18,
     // Color.value: ULong
