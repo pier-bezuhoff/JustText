@@ -204,8 +204,8 @@ class HomeViewModel(
         }
     }
 
-    // second switch to cloud fails with
-    // [DefaultDispatch] HttpClient REQUEST failed with exception: kotlinx.coroutines.JobCancellationException: Parent job is Completed; job=SupervisorJobImpl{Completed}@3fa7085
+    // FIX: second switch to cloud fails with
+    //  [DefaultDispatch] HttpClient REQUEST failed with exception: kotlinx.coroutines.JobCancellationException: Parent job is Completed; job=SupervisorJobImpl{Completed}@3fa7085
     fun switchTextSource() {
         if (uiState.value.isLocal) {
             if (textCloudRepo.value != null) {
@@ -247,12 +247,14 @@ class HomeViewModel(
     }
 
     fun save() {
-        if (uiState.value.contentStatus != ContentStatus.LOADING) {
-            viewModelScope.launch {
+        val uiState0 = uiState.value
+        when (uiState0.contentStatus) {
+            ContentStatus.LOADING, ContentStatus.SAVING -> {}
+            else -> viewModelScope.launch {
                 saveDatastoreData()
                 withContext(Dispatchers.IO) {
                     val saveResult =
-                        if (uiState.value.isLocal) {
+                        if (uiState0.isLocal) {
                             saveTextToFile()
                         } else {
                             saveTextToCloud()
@@ -290,11 +292,12 @@ class HomeViewModel(
         }
     }
 
-    fun stopPeriodicSave() {
+    private fun stopPeriodicSave() {
         periodicSaveJob?.cancel()
         periodicSaveIsOn.update { false }
     }
 
+    /** same as [save] but uses runBlocking for coroutines */
     fun persistState() {
         val saveResult = if (uiState.value.isLocal) {
             saveTextToFile()

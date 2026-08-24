@@ -1,13 +1,11 @@
 package com.pierbezuhoff.justtext.data
 
-import androidx.compose.material3.rememberTopAppBarState
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
-import kotlin.io.encoding.Base64
 
 object TextEncryption {
     private const val AES_GCM_ALGORITHM = "AES/GCM/NoPadding"
