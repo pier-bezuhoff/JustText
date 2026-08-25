@@ -2,6 +2,8 @@ package com.pierbezuhoff.justtext.data
 
 import android.content.Context
 import android.net.Uri
+import com.pierbezuhoff.justtext.runCatching1
+import kotlinx.io.IOException
 import okio.FileNotFoundException
 import java.io.File
 
@@ -21,7 +23,7 @@ class BackgroundImageRepo(
     }
 
     fun loadAndOverwrite(uri: Uri): Result<TaggedUri> =
-        runCatching {
+        runCatching1<TaggedUri, IOException> {
             applicationContext.contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output ->
                     input.copyTo(output)
@@ -29,10 +31,7 @@ class BackgroundImageRepo(
                 val newTaggedUri = getTaggedUri()
                 println("finished copying new bg image $uri -> $newTaggedUri")
                 newTaggedUri
-            } ?: throw Error("cannot copy new bg image")
-        }.onFailure { e ->
-            e.printStackTrace()
-            println("failed to copy new bg image")
+            } ?: throw IOException("null openInputStream($uri), cannot copy new bg image")
         }
 
     companion object {

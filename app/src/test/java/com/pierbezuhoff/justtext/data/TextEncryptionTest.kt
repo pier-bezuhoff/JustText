@@ -2,7 +2,6 @@ package com.pierbezuhoff.justtext.data
 
 import com.pierbezuhoff.justtext.byteArrayOf
 import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.collections.shouldBeLargerThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.string
@@ -35,11 +34,10 @@ class TextEncryptionTest : FunSpec({
         val plainGen = Arb.string(0, 100)
         val passwordGen = Arb.string(1, 10)
         forAll(10, plainGen, passwordGen) { plainText: String, password: String ->
-            val encryptedPackage = TextEncryption.encryptWithPassword(plainText, password)
-            val decryptedPlainText = TextEncryption.decryptWithPassword(encryptedPackage, password)
+            val encryptedPackage = TextEncryption.encryptWithPassword(plainText, password).getOrThrow()
+            val decryptedPlainText = TextEncryption.decryptWithPassword(encryptedPackage, password).getOrThrow()
             decryptedPlainText == plainText
         }
-        TextEncryption.encryptWithPassword("abc", "111") shouldBeLargerThan byteArrayOf()
     }
 
     test("encrypt(decrypt(y)) = y") {
@@ -49,7 +47,9 @@ class TextEncryptionTest : FunSpec({
             salt, iv
         )
         TextEncryption.encrypt(
-            TextEncryption.decryptWithPassword(encryptedPackage, password).toByteArray(),
+            TextEncryption.decryptWithPassword(encryptedPackage, password)
+                .getOrThrow()
+                .toByteArray(),
             TextEncryption.deriveKey(password, salt),
             salt, iv
         ) shouldBe encryptedPackage

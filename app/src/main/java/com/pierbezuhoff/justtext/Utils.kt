@@ -18,3 +18,62 @@ fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
         initialValue = initialValue,
     )
 
+inline fun <R, reified E1> runCatching1(block: () -> R): Result<R> {
+    return try {
+        Result.success(block())
+    } catch (e: Exception) {
+        when (e) {
+            is E1 -> Result.failure(e)
+            else -> throw e
+        }
+    }
+}
+
+inline fun <R, reified E1, reified E2> runCatching2(block: () -> R): Result<R> {
+    return try {
+        Result.success(block())
+    } catch (e: Exception) {
+        when (e) {
+            is E1, is E2 -> Result.failure(e)
+            else -> throw e
+        }
+    }
+}
+
+inline fun <T, R, reified E1> Result<T>.flatMapCatching1(
+    block: (T) -> Result<R>
+): Result<R> =
+    fold(
+        onSuccess = { t ->
+            try {
+                block(t)
+            } catch (e: Exception) {
+                when (e) {
+                    is E1 -> Result.failure(e)
+                    else -> throw e
+                }
+            }
+        },
+        onFailure = { e ->
+            Result.failure(e)
+        }
+    )
+
+inline fun <T, R, reified E1, reified E2> Result<T>.flatMapCatching2(
+    block: (T) -> Result<R>
+): Result<R> =
+    fold(
+        onSuccess = { t ->
+            try {
+                block(t)
+            } catch (e: Exception) {
+                when (e) {
+                    is E1, is E2 -> Result.failure(e)
+                    else -> throw e
+                }
+            }
+        },
+        onFailure = { e ->
+            Result.failure(e)
+        }
+    )

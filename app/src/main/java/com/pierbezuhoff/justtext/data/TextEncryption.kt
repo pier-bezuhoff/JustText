@@ -1,6 +1,9 @@
 package com.pierbezuhoff.justtext.data
 
+import com.pierbezuhoff.justtext.runCatching2
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
+import java.security.spec.InvalidKeySpecException
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -8,6 +11,7 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object TextEncryption {
+    private const val AES_ALGORITHM = "AES"
     private const val AES_GCM_ALGORITHM = "AES/GCM/NoPadding"
     private const val DERIVATION_ALGORITHM = "PBKDF2WithHmacSHA256"
 
@@ -21,6 +25,7 @@ object TextEncryption {
     const val IV_OFFSET = SALT_LENGTH_BYTES
     const val CIPHERTEXT_OFFSET = IV_OFFSET + IV_LENGTH_BYTES
 
+    @Throws(InvalidKeySpecException::class)
     fun deriveKey(
         password: String,
         salt: ByteArray,
@@ -33,9 +38,10 @@ object TextEncryption {
         )
         val keyFactory = SecretKeyFactory.getInstance(DERIVATION_ALGORITHM)
         val secretKey = keyFactory.generateSecret(keySpec)
-        return SecretKeySpec(secretKey.encoded, "AES")
+        return SecretKeySpec(secretKey.encoded, AES_ALGORITHM)
     }
 
+    @Throws(GeneralSecurityException::class, IllegalStateException::class)
     fun encrypt(
         plain: ByteArray,
         key: SecretKeySpec,
@@ -54,6 +60,7 @@ object TextEncryption {
         return output
     }
 
+    @Throws(GeneralSecurityException::class, IllegalStateException::class)
     fun decrypt(
         cipherText: ByteArray,
         key: SecretKeySpec,
@@ -70,27 +77,29 @@ object TextEncryption {
     fun encryptWithPassword(
         plainText: String,
         password: String,
-    ): ByteArray {
-        val random = SecureRandom()
-        val salt = ByteArray(SALT_LENGTH_BYTES)
-        random.nextBytes(salt)
-        val iv = ByteArray(IV_LENGTH_BYTES)
-        random.nextBytes(iv)
-        val key = deriveKey(password, salt)
-        return encrypt(plainText.toByteArray(), key, salt, iv)
+    ): Result<ByteArray> {
+        return runCatching2<ByteArray, GeneralSecurityException, IllegalStateException> {
+            val random = SecureRandom()
+            val salt = ByteArray(SALT_LENGTH_BYTES)
+            random.nextBytes(salt)
+            val iv = ByteArray(IV_LENGTH_BYTES)
+            random.nextBytes(iv)
+            val key = deriveKey(password, salt)
+            encrypt(plainText.toByteArray(), key, salt, iv)
+        }
     }
 
     fun decryptWithPassword(
         encryptedPackage: ByteArray,
         password: String,
-    ): String {
-        val salt = encryptedPackage.sliceArray(SALT_OFFSET until IV_OFFSET)
-        val iv = encryptedPackage.sliceArray(IV_OFFSET until CIPHERTEXT_OFFSET)
-        val cipherText = encryptedPackage.sliceArray(CIPHERTEXT_OFFSET until encryptedPackage.size)
-        val key = deriveKey(password, salt)
-        val plain = decrypt(cipherText, key, iv)
-//        Failure(javax.crypto.AEADBadTagException: error:1e000065:Cipher functions:OPENSSL_internal:BAD_DECRYPT)
-        return plain.decodeToString()
+    ): Result<String> {
+        return runCatching2<String, GeneralSecurityException, IllegalStateException>  {
+            val salt = encryptedPackage.sliceArray(SALT_OFFSET until IV_OFFSET)
+            val iv = encryptedPackage.sliceArray(IV_OFFSET until CIPHERTEXT_OFFSET)
+            val cipherText = encryptedPackage.sliceArray(CIPHERTEXT_OFFSET until encryptedPackage.size)
+            val key = deriveKey(password, salt)
+            val plain = decrypt(cipherText, key, iv)
+            plain.decodeToString()
+        }
     }
 }
-

@@ -10,10 +10,12 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.pierbezuhoff.justtext.JustTextApplication
 import com.pierbezuhoff.justtext.data.BackgroundImageRepo
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
@@ -28,22 +30,22 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via dataStore
 class HomeViewModel(
+    application: JustTextApplication,
     private val dataStore: DataStore<Preferences>,
     private val encryptedDataStore: DataStore<EncryptedData>,
     private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
-) : ViewModel() {
+) : AndroidViewModel(application) {
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
     val uiState: StateFlow<UiState>
         field = MutableStateFlow(UiState())
@@ -212,12 +214,14 @@ class HomeViewModel(
                 uiState.update { it.copy(
                     contentStatus = ContentStatus.SAVING,
                 ) }
-                viewModelScope.launch(Dispatchers.IO) {
+                viewModelScope.launch {
                     saveTextToFile()
                     uiState.update { it.copy(
                         contentStatus = ContentStatus.LOADING,
                     ) }
+                    println("before load cloud")
                     loadTextFromCloud()
+                    println("after load cloud")
                 }
             } else {
                 println("no cloud repo")
@@ -226,11 +230,13 @@ class HomeViewModel(
             uiState.update { it.copy(
                 contentStatus = ContentStatus.SAVING,
             ) }
-            viewModelScope.launch(Dispatchers.IO) {
-                saveTextToCloud()
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.LOADING,
-                ) }
+            viewModelScope.launch {
+                launch(Dispatchers.Default) { // tmp
+                    saveTextToCloud()
+                    uiState.update { it.copy(
+                        contentStatus = ContentStatus.LOADING,
+                    ) }
+                }
                 loadTextFromFile()
             }
         }
@@ -252,24 +258,29 @@ class HomeViewModel(
             ContentStatus.LOADING, ContentStatus.SAVING -> {}
             else -> viewModelScope.launch {
                 saveDatastoreData()
-                withContext(Dispatchers.IO) {
-                    val saveResult =
-                        if (uiState0.isLocal) {
-                            saveTextToFile()
-                        } else {
-                            saveTextToCloud()
-                        }
-                    saveResult.onSuccess {
+                val saveResult =
+                    if (uiState0.isLocal) {
+                        saveTextToFile()
+                    } else {
+                        saveTextToCloud()
+                    }
+                saveResult.fold(
+                    onSuccess = {
                         markSaved()
-                        println("saved.")
-                    }.onFailure { e ->
+                    },
+                    onFailure = { e ->
                         uiState.update { it.copy(
                             contentStatus = ContentStatus.SAVING_FAILED
                         ) }
                         e.printStackTrace()
-                        println("saving failed")
+                        launch {
+                            delay(3.seconds)
+                            uiState.update { it.copy(
+                                contentStatus = ContentStatus.UNSAVED
+                            ) }
+                        }
                     }
-                }
+                )
             }
         }
     }
@@ -278,16 +289,11 @@ class HomeViewModel(
         if (!periodicSaveIsOn.value) {
             periodicSaveIsOn.update { true }
             periodicSaveJob = viewModelScope.launch(Dispatchers.Default) {
-                flow {
-                    while (true) {
-                        emit(Unit)
-                        delay(PERIODIC_SAVE_DELAY)
-                    }
+                while (true) {
+                    println("periodic save")
+                    delay(PERIODIC_SAVE_DELAY)
+                    save()
                 }
-                    .collect {
-                        println("periodic save")
-                        save()
-                    }
             }
         }
     }
@@ -299,10 +305,13 @@ class HomeViewModel(
 
     /** same as [save] but uses runBlocking for coroutines */
     fun persistState() {
-        val saveResult = if (uiState.value.isLocal) {
-            saveTextToFile()
-        } else {
-            runBlocking {
+        println("persist state")
+        val saveResult = when {
+            uiState.value.contentStatus == ContentStatus.SYNCED ->
+                Result.success(Unit)
+            uiState.value.isLocal ->
+                saveTextToFile()
+            else -> runBlocking {
                 saveTextToCloud()
             }
         }
@@ -345,16 +354,14 @@ class HomeViewModel(
     private fun saveTextToFile(): Result<Unit> =
         textFileRepo.save(uiState.value.tfValue.text)
 
-    private suspend fun saveTextToCloud(): Result<Unit> =
-        runCatching {
-            textCloudRepo.value?.push(uiState.value.tfValue.text)
-        }.mapCatching {
-            if (it == null)
-                throw Error("No cloud repo")
-            else Unit
-        }
+    private suspend fun saveTextToCloud(): Result<Unit> {
+        val repo = textCloudRepo.value
+            ?: return Result.failure(Error("No cloud repo"))
+        return repo.push(uiState.value.tfValue.text)
+    }
 
     override fun onCleared() {
+        println("VM.onCleared")
         stopPeriodicSave()
     }
 
@@ -370,6 +377,7 @@ class HomeViewModel(
                 //val savedStateHandle = extras.createSavedStateHandle()
                 val applicationContext = application.applicationContext
                 return HomeViewModel(
+                    application = application as JustTextApplication,
                     dataStore = application.dataStore,
                     encryptedDataStore = application.encryptedDataStore,
                     textFileRepo = TextFileRepo(applicationContext),

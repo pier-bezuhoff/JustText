@@ -259,7 +259,7 @@ fun HomeScreen(
                     fontSize = uiState.fontSize,
                     textColor = textColor,
                     readOnly = when (uiState.contentStatus) {
-                        ContentStatus.LOADING, ContentStatus.SAVING -> true
+                        ContentStatus.LOADING -> true
                         else -> false
                     }
                     ,
@@ -383,7 +383,7 @@ private fun TopBar(
                 if (showTextSourceProperitesPopup) {
                     TextSourcePropertiesPopup(
                         initialEndpoint = encryptedData.noteEndpoint ?: "example.com",
-                        initialPassword = encryptedData.notePassword ?: "",
+                        initialPassword = "", // you could show it but
                         dismiss = { showTextSourceProperitesPopup = false },
                         setCloudRepoProperties = {
                             setCloudRepoProperties(it)
