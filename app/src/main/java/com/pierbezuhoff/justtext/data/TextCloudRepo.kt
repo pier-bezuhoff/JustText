@@ -81,6 +81,8 @@ class TextCloudRepo(
                 contentType(ContentType.Text.Plain)
                 setBody(text)
             }
+            // NOTE: apps script endpoint usually returns 403 or 405 while actually
+            //  uploading successfully, so post mostly 'fails'
             if (response.status.isSuccess())
                 Unit
             else
