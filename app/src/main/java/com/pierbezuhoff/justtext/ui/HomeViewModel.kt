@@ -47,15 +47,19 @@ class HomeViewModel(
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : AndroidViewModel(application) {
     // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
+    val textCloudRepo: StateFlow<TextCloudRepo?>
+        field = MutableStateFlow<TextCloudRepo?>(null)
+
     val uiState: StateFlow<UiState>
-        field = MutableStateFlow(UiState())
+        field = MutableStateFlow(UiState(
+            contentStatus = ContentStatus.LOADING,
+        ))
 
     val backgroundImageUri: StateFlow<TaggedUri?>
         field = MutableStateFlow<TaggedUri?>(null)
 
     val encryptedDataFlow: Flow<EncryptedData> = encryptedDataStore.data
 
-    private val textCloudRepo = MutableStateFlow<TextCloudRepo?>(null)
 
     private val periodicSaveIsOn = MutableStateFlow(false)
     private var periodicSaveJob: Job? = null
@@ -118,22 +122,20 @@ class HomeViewModel(
             val cursorLocation = data[CURSOR_LOCATION_KEY]
             val fontSize = data[FONT_SIZE_KEY]
             val isLocal = data[IS_LOCAL_KEY]
-            uiState.update { state ->
-                state.copy(
-                    isLocal = isLocal ?: true,
-                    tfValue = if (cursorLocation == null) {
-                        state.tfValue
-                    } else {
-                        state.tfValue.copy(
-                            selection = TextRange(cursorLocation)
-                        )
-                    },
-                    fontSize = fontSize ?: state.fontSize,
-                    textColor = textColor ?: state.textColor,
-                    textBackgroundColor = textBackgroundColor ?: state.textBackgroundColor,
-                    imageBackgroundColor = imageBackgroundColor ?: state.imageBackgroundColor,
-                )
-            }
+            uiState.update { it.copy(
+                isLocal = isLocal ?: true,
+                tfValue = if (cursorLocation == null) {
+                    it.tfValue
+                } else {
+                    it.tfValue.copy(
+                        selection = TextRange(cursorLocation)
+                    )
+                },
+                fontSize = fontSize ?: it.fontSize,
+                textColor = textColor ?: it.textColor,
+                textBackgroundColor = textBackgroundColor ?: it.textBackgroundColor,
+                imageBackgroundColor = imageBackgroundColor ?: it.imageBackgroundColor,
+            ) }
         }
     }
 
@@ -206,8 +208,6 @@ class HomeViewModel(
         }
     }
 
-    // FIX: second switch to cloud fails with
-    //  [DefaultDispatch] HttpClient REQUEST failed with exception: kotlinx.coroutines.JobCancellationException: Parent job is Completed; job=SupervisorJobImpl{Completed}@3fa7085
     fun switchTextSource() {
         if (uiState.value.isLocal) {
             if (textCloudRepo.value != null) {
@@ -219,9 +219,7 @@ class HomeViewModel(
                     uiState.update { it.copy(
                         contentStatus = ContentStatus.LOADING,
                     ) }
-                    println("before load cloud")
                     loadTextFromCloud()
-                    println("after load cloud")
                 }
             } else {
                 println("no cloud repo")
@@ -255,8 +253,15 @@ class HomeViewModel(
     fun save() {
         val uiState0 = uiState.value
         when (uiState0.contentStatus) {
-            ContentStatus.LOADING, ContentStatus.SAVING -> {}
+            ContentStatus.SYNCED,
+            ContentStatus.LOADING, ContentStatus.LOADING_FAILED,
+            ContentStatus.SAVING -> {
+                println("saving skipped")
+            }
             else -> viewModelScope.launch {
+                uiState.update { it.copy(
+                    contentStatus = ContentStatus.SAVING
+                ) }
                 saveDatastoreData()
                 val saveResult =
                     if (uiState0.isLocal) {
@@ -306,13 +311,17 @@ class HomeViewModel(
     /** same as [save] but uses runBlocking for coroutines */
     fun persistState() {
         println("persist state")
-        val saveResult = when {
-            uiState.value.contentStatus == ContentStatus.SYNCED ->
+        val saveResult = when (uiState.value.contentStatus ) {
+            ContentStatus.SYNCED ->
                 Result.success(Unit)
-            uiState.value.isLocal ->
-                saveTextToFile()
-            else -> runBlocking {
-                saveTextToCloud()
+            ContentStatus.LOADING, ContentStatus.LOADING_FAILED, ContentStatus.SAVING ->
+                Result.failure(Error("Bad state for persisting text"))
+            else -> when {
+                uiState.value.isLocal ->
+                    saveTextToFile()
+                else -> runBlocking {
+                    saveTextToCloud()
+                }
             }
         }
         runBlocking {
@@ -320,10 +329,6 @@ class HomeViewModel(
         }
         saveResult.onSuccess {
             markSaved()
-        }.onFailure {
-            uiState.update { it.copy(
-                contentStatus = ContentStatus.SAVING_FAILED
-            ) }
         }
     }
 
@@ -363,6 +368,7 @@ class HomeViewModel(
     override fun onCleared() {
         println("VM.onCleared")
         stopPeriodicSave()
+        textCloudRepo.value?.client?.close()
     }
 
     companion object {

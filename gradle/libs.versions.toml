@@ -8,6 +8,7 @@ compose-bom = "2026.06.01" # 2026.08.00 requires targetSdk 37
 core-ktx = "1.18.0"
 lifecycle = "2.11.0-beta01"
 compose-activity = "1.13.0"
+coroutines = "1.11.0"
 serialization = "1.11.0"
 colormath = "3.6.1"
 
@@ -35,6 +36,8 @@ material3 = { group = "androidx.compose.material3", name = "material3" }
 material3-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive" }
 datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 datastore-tink = { group = "androidx.datastore", name = "datastore-tink", version.ref = "datastore" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 coil = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 colormath = { group = "com.github.ajalt.colormath", name = "colormath", version.ref = "colormath" }

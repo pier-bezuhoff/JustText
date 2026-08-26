@@ -83,6 +83,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
@@ -91,6 +92,7 @@ import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.data.TextCloudRepo
+import com.pierbezuhoff.justtext.data.runCatchingOnlyNet
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
@@ -177,6 +179,23 @@ fun HomeScreenRoot(
         }
         null -> {}
     }
+//    val repo by viewModel.textCloudRepo.collectAsStateWithLifecycle()
+//    LaunchedEffect(repo) {
+//        if (repo != null) {
+//            println("started pull 1")
+//            repo?.pull()
+//            println("pull 1 done")
+//            encryptedData.let {
+//                if (it.noteEndpoint != null && it.notePassword != null) {
+//                    runCatching {
+//                        TextCloudRepo(it.noteEndpoint, it.notePassword).pull()
+//                    }
+//                } else null
+//            }
+////            repo?.pull()
+//            println("pull 2 done")
+//        }
+//    }
 }
 
 @Composable

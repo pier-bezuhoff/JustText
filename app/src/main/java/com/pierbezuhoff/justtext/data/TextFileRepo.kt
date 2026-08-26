@@ -1,7 +1,7 @@
 package com.pierbezuhoff.justtext.data
 
 import android.content.Context
-import com.pierbezuhoff.justtext.runCatching1
+import com.pierbezuhoff.justtext.runCatchingOnly
 import kotlinx.io.IOException
 
 class TextFileRepo(
@@ -9,7 +9,7 @@ class TextFileRepo(
 ) {
 
     fun load(): Result<String> =
-        runCatching1<String, IOException> {
+        runCatchingOnly({ it is IOException }) {
             applicationContext.openFileInput(FILENAME)
                 ?.bufferedReader()
                 ?.useLines { lines ->
@@ -20,7 +20,7 @@ class TextFileRepo(
         }
 
     fun save(text: String): Result<Unit> =
-        runCatching1<Unit, IOException> {
+        runCatchingOnly({ it is IOException }) {
             applicationContext.openFileOutput(FILENAME, Context.MODE_PRIVATE)?.use {
                 it.write(text.toByteArray())
             } ?: throw IOException("null openFileInput($FILENAME)")

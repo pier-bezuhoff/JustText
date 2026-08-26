@@ -2,6 +2,7 @@ package com.pierbezuhoff.justtext
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,62 +19,43 @@ fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
         initialValue = initialValue,
     )
 
-inline fun <R, reified E1> runCatching1(block: () -> R): Result<R> {
+/** alternative to [runCatching], but only catching exceptions satisfying
+ * [catchFilter], non-cancellation exceptions by default */
+inline fun <C, R> C.runCatchingOnly(
+    crossinline catchFilter: (Throwable) -> Boolean = {
+        it is Exception && it !is CancellationException
+    },
+    block: C.() -> R,
+): Result<R> {
     return try {
         Result.success(block())
     } catch (e: Exception) {
-        when (e) {
-            is E1 -> Result.failure(e)
-            else -> throw e
-        }
+        if (catchFilter(e))
+            Result.failure(e)
+        else
+            throw e
     }
 }
 
-inline fun <R, reified E1, reified E2> runCatching2(block: () -> R): Result<R> {
-    return try {
-        Result.success(block())
-    } catch (e: Exception) {
-        when (e) {
-            is E1, is E2 -> Result.failure(e)
-            else -> throw e
-        }
-    }
-}
-
-inline fun <T, R, reified E1> Result<T>.flatMapCatching1(
-    block: (T) -> Result<R>
-): Result<R> =
-    fold(
+inline fun <T, R> Result<T>.flatMapCatchingOnly(
+    crossinline catchFilter: (Throwable) -> Boolean = {
+        it is Exception && it !is CancellationException
+    },
+    block: (T) -> Result<R>,
+): Result<R> {
+    return fold(
         onSuccess = { t ->
             try {
                 block(t)
             } catch (e: Exception) {
-                when (e) {
-                    is E1 -> Result.failure(e)
-                    else -> throw e
-                }
+                if (catchFilter(e))
+                    Result.failure(e)
+                else
+                    throw e
             }
         },
         onFailure = { e ->
             Result.failure(e)
         }
     )
-
-inline fun <T, R, reified E1, reified E2> Result<T>.flatMapCatching2(
-    block: (T) -> Result<R>
-): Result<R> =
-    fold(
-        onSuccess = { t ->
-            try {
-                block(t)
-            } catch (e: Exception) {
-                when (e) {
-                    is E1, is E2 -> Result.failure(e)
-                    else -> throw e
-                }
-            }
-        },
-        onFailure = { e ->
-            Result.failure(e)
-        }
-    )
+}

@@ -2,7 +2,7 @@ package com.pierbezuhoff.justtext.data
 
 import android.content.Context
 import android.net.Uri
-import com.pierbezuhoff.justtext.runCatching1
+import com.pierbezuhoff.justtext.runCatchingOnly
 import kotlinx.io.IOException
 import okio.FileNotFoundException
 import java.io.File
@@ -23,7 +23,7 @@ class BackgroundImageRepo(
     }
 
     fun loadAndOverwrite(uri: Uri): Result<TaggedUri> =
-        runCatching1<TaggedUri, IOException> {
+        runCatchingOnly({ it is IOException }) {
             applicationContext.contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output ->
                     input.copyTo(output)

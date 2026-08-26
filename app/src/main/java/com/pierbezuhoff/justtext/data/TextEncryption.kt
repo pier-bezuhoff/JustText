@@ -1,6 +1,6 @@
 package com.pierbezuhoff.justtext.data
 
-import com.pierbezuhoff.justtext.runCatching2
+import com.pierbezuhoff.justtext.runCatchingOnly
 import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import java.security.spec.InvalidKeySpecException
@@ -78,7 +78,9 @@ object TextEncryption {
         plainText: String,
         password: String,
     ): Result<ByteArray> {
-        return runCatching2<ByteArray, GeneralSecurityException, IllegalStateException> {
+        return runCatchingOnly(catchFilter = {
+            it is GeneralSecurityException || it is IllegalStateException
+        }) {
             val random = SecureRandom()
             val salt = ByteArray(SALT_LENGTH_BYTES)
             random.nextBytes(salt)
@@ -93,7 +95,9 @@ object TextEncryption {
         encryptedPackage: ByteArray,
         password: String,
     ): Result<String> {
-        return runCatching2<String, GeneralSecurityException, IllegalStateException>  {
+        return runCatchingOnly({
+            it is GeneralSecurityException || it is IllegalStateException
+        })  {
             val salt = encryptedPackage.sliceArray(SALT_OFFSET until IV_OFFSET)
             val iv = encryptedPackage.sliceArray(IV_OFFSET until CIPHERTEXT_OFFSET)
             val cipherText = encryptedPackage.sliceArray(CIPHERTEXT_OFFSET until encryptedPackage.size)
