@@ -127,6 +127,7 @@ fun HomeScreenRoot(
         snackbarHostState = snackbar,
         quitApp = {
             viewModel.persistState()
+            viewModel.clearResources()
             quitApp()
         },
         save = viewModel::save,

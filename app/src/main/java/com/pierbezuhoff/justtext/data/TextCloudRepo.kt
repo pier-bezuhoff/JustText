@@ -19,6 +19,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.io.IOException
@@ -47,10 +48,19 @@ class TextCloudRepo(
         install(HttpRedirect) {
             checkHttpMethod = false
         }
-        install(HttpRequestRetry) // Should be installed before HttpTimeout
-        install(HttpTimeout) {
-            // ...
+        // post retries can behave erratically with race conditioning get
+        // leading to data erasure
+        install(HttpRequestRetry) {
+            retryIf(2) { request, response ->
+                request.method == HttpMethod.Get &&
+                !response.status.isSuccess()
+            }
+            exponentialDelay()
+            modifyRequest { request ->
+                request.headers.append("x-retry-count", retryCount.toString())
+            }
         }
+        install(HttpTimeout)
         followRedirects = true
     }
 
