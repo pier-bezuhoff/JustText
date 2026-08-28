@@ -1,5 +1,6 @@
 package com.pierbezuhoff.justtext.data
 
+import android.accounts.NetworkErrorException
 import androidx.compose.runtime.Immutable
 import com.pierbezuhoff.justtext.flatMapCatchingOnly
 import io.ktor.client.HttpClient
@@ -22,6 +23,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlin.io.encoding.Base64
@@ -95,24 +98,23 @@ class TextCloudRepo(
         }
     }
 
-    suspend fun pull(): Result<String> {
-        return get()
-            .flatMapCatchingOnly({
-                it is IllegalArgumentException || it is IndexOutOfBoundsException
-            }) { bytes ->
-                if (password.isEmpty()) {
-                    Result.success(
-                        bytes.decodeToString()
-                    )
-                } else {
-                    val encryptedPackage = Base64.decode(bytes)
-                    TextEncryption.decryptWithPassword(encryptedPackage, password)
-                }
+    suspend fun pull(): Result<String> = withContext(Dispatchers.IO) {
+        get().flatMapCatchingOnly({
+            it is IllegalArgumentException || it is IndexOutOfBoundsException
+        }) { bytes ->
+            if (password.isEmpty()) {
+                Result.success(
+                    bytes.decodeToString()
+                )
+            } else {
+                val encryptedPackage = Base64.decode(bytes)
+                TextEncryption.decryptWithPassword(encryptedPackage, password)
             }
+        }
     }
 
-    suspend fun push(text: String): Result<Unit> {
-        return if (password.isEmpty()) {
+    suspend fun push(text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        if (password.isEmpty()) {
             post(text)
         } else {
             TextEncryption.encryptWithPassword(text, password)
@@ -135,6 +137,7 @@ inline fun <T, R> T.runCatchingOnlyNet(
     } catch (e: Exception) {
         when (e) {
             is IOException,
+            is NetworkErrorException,
             is ResponseException,
             is NoTransformationFoundException,
             is DoubleReceiveException,

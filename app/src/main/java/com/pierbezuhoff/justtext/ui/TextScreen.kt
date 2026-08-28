@@ -1,10 +1,19 @@
 package com.pierbezuhoff.justtext.ui
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -16,28 +25,35 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.getTextAfterSelection
-import androidx.compose.ui.text.input.getTextBeforeSelection
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlin.time.Duration.Companion.milliseconds
 
-private data object SelectLineKey
-private data object DeleteSelectionKey
+private sealed interface SelectionContextAction {
+    data object SelectLine : SelectionContextAction
+    data object DeleteSelection : SelectionContextAction
+}
 
-// MAYBE: migrate to TextFieldState for proper Delete context action
+@OptIn(FlowPreview::class)
 @Composable
 fun TextScreen(
-    tfValue: TextFieldValue,
+    initialTFVState: State<TextFieldValue>,
     fontSize: Int,
     textColor: Color,
     readOnly: Boolean,
     modifier: Modifier = Modifier,
-    setTFValue: (TextFieldValue) -> Unit = {},
+    onNewTFValue: (TextFieldValue) -> Unit = {},
 ) {
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = textColor,
@@ -50,54 +66,71 @@ fun TextScreen(
 //    val annotatedTFValue = tfValue.copy(
 //        annotatedString = annotateUrlsInText(tfValue.text, Color.Green)
 //    )
-    val startPadding = with (LocalDensity.current) {
+    val density = LocalDensity.current
+    val startPadding = with (density) {
         12.sp.toDp()
     }
-    val endPadding = with (LocalDensity.current) {
+    val endPadding = with (density) {
         4.sp.toDp()
     }
     // NOTE: rich text editing is not yet supported (since 2019..):
     //  https://issuetracker.google.com/issues/135556699
-    PatchedBasicTextField(
-        tfValue,
-        onValueChange = setTFValue,
+    val tfState = rememberTextFieldState(
+        initialTFVState.value.text,
+        initialTFVState.value.selection,
+    )
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(tfState, initialTFVState, lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            snapshotFlow { initialTFVState.value }
+                .collectLatest { initialTFV ->
+                    tfState.edit {
+                        replace(0, length, initialTFV.text)
+                        selection = initialTFV.selection
+                    }
+                }
+        }
+    }
+    LaunchedEffect(tfState, onNewTFValue, lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            snapshotFlow { tfState.text }
+                .debounce(200.milliseconds)
+                .collectLatest { text ->
+                    onNewTFValue(TextFieldValue(text.toString(), tfState.selection))
+                }
+        }
+    }
+    BasicTextField(
+        state = tfState,
         modifier = modifier
+            .fillMaxWidth()
             .padding(start = startPadding, end = endPadding)
             .appendTextContextMenuComponents {
-                item(SelectLineKey, "Select line") {
-                    val min = tfValue.selection.min
-                    val max = tfValue.selection.max
-                    val previousLineBreak = tfValue.text.withIndex().lastOrNull { (i, char) ->
+                item(SelectionContextAction.SelectLine, "Select line") {
+                    // note that this doesn't detect soft wraps
+                    val text = tfState.text
+                    val selection = tfState.selection
+                    val min = selection.min
+                    val max = selection.max
+                    val previousLineBreak = text.withIndex().lastOrNull { (i, char) ->
                         i <= min && char == '\n'
                     }?.index ?: -1
-                    val nextLineBreak = tfValue.text.withIndex().firstOrNull { (i, char) ->
+                    val nextLineBreak = text.withIndex().firstOrNull { (i, char) ->
                         i >= max && char == '\n'
-                    }?.index ?: tfValue.text.length
+                    }?.index ?: text.length
                     val newSelection = TextRange(previousLineBreak + 1, nextLineBreak)
-                    setTFValue(tfValue.copy(
-                        selection = newSelection
-                    ))
+                    tfState.edit {
+                        this.selection = newSelection
+                    }
                 }
                 if (!readOnly) {
                     separator()
-                    item(DeleteSelectionKey, "Delete") {
-                        // NOTE: when selection is auto-expanded (eg after selecting a phone-like number)
-                        //  (see ComposeFoundationFlags.isSmartSelectionEnabled)
-                        //  tfValue.selection points to the initial, smaller selection
-                        //  so it Deletes only it (built-in Cut works somehow)
-                        //  built-in Cut is defined as
-                        //  `textFieldState.deleteSelectedText()` + add result to clipboard
-//                    println("Delete context-action ${tfValue.selection} / comp ${tfValue.composition}")
-                        // this is the same way built-in Cut is implemented in TextFieldSelectionManager
-                        val newText =
-                            tfValue.getTextBeforeSelection(tfValue.text.length) +
-                            tfValue.getTextAfterSelection(tfValue.text.length)
-                        val newCursorOffset = tfValue.selection.min
-                        val newValue = TextFieldValue(
-                            annotatedString = newText,
-                            selection = TextRange(newCursorOffset, newCursorOffset),
-                        )
-                        setTFValue(newValue)
+                    item(SelectionContextAction.DeleteSelection, "Delete") {
+                        val selection = tfState.selection
+                        // not undoable, tho built-in cut is also not undoable
+                        tfState.edit {
+                            replace(selection.min, selection.max, "")
+                        }
                         close()
                     }
                 }
@@ -105,10 +138,8 @@ fun TextScreen(
         ,
         readOnly = readOnly,
         textStyle = textStyle,
-        minLines = 50,
-        maxLines = Int.MAX_VALUE,
+        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 50),
         cursorBrush = SolidColor(textColor),
-        containerColor = Color.Transparent,
     )
 }
 
@@ -153,9 +184,12 @@ private fun annotateUrlsInText(
 @Preview(showBackground = true)
 @Composable
 private fun TextScreenPreview() {
+    val initialTFVState = remember { mutableStateOf(
+        TextFieldValue("hi!!!!!")
+    ) }
     JustTextTheme(ColorTheme.Dark) {
         TextScreen(
-            tfValue = TextFieldValue("hi!!!!!"),
+            initialTFVState = initialTFVState,
             fontSize = 30,
             textColor = Color.Black,
             readOnly = false,

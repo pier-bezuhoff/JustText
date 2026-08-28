@@ -94,7 +94,6 @@ import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.data.TextCloudRepo
-import com.pierbezuhoff.justtext.ui.HomeViewModel.Companion.PERIODIC_SAVE_DELAY
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
@@ -124,7 +123,7 @@ fun HomeScreenRoot(
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
-    val encryptedData by viewModel.encryptedDataFlow.collectAsStateWithLifecycle(EncryptedData())
+    val encryptedData by viewModel.encryptedData.collectAsStateWithLifecycle(EncryptedData())
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     HomeScreen(
@@ -148,7 +147,7 @@ fun HomeScreenRoot(
                 ActivityResultContracts.PickVisualMedia.ImageOnly
             ))
         },
-        setTFValue = viewModel::setTFValue,
+        onNewTFValue = viewModel::onNewTFValue,
     )
     when (openedDialogType) {
         DialogType.FONT_SIZE -> {
@@ -195,8 +194,8 @@ fun HomeScreenRoot(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             withContext(Dispatchers.Default) {
                 while (isActive) {
-                    println("periodic save")
                     delay(PERIODIC_SAVE_DELAY)
+                    println("periodic save")
                     viewModel.save()
                 }
             }
@@ -218,7 +217,7 @@ fun HomeScreen(
     openFontSizeDialog: () -> Unit = {},
     openColorsDialog: () -> Unit = {},
     openBackgroundImagePicker: () -> Unit = {},
-    setTFValue: (TextFieldValue) -> Unit = {},
+    onNewTFValue: (TextFieldValue) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -257,9 +256,6 @@ fun HomeScreen(
             backgroundImageUri?.let { taggedUri ->
                 BackgroundImage(taggedUri)
             }
-            // BUG: when keyboard appears, in its future place image overlays becomes
-            //  bright alpha=0
-            //  (seemingly only on older Android versions)
             val textBackgroundColor = uiState.textBackgroundColor?.let { Color(it) }
                 ?: MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f)
             Surface(
@@ -277,17 +273,22 @@ fun HomeScreen(
                 ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
+                val initialTFVState = remember(uiState.initialText) {
+                    mutableStateOf(
+                        TextFieldValue(uiState.initialText, uiState.textSelection)
+                    )
+                }
                 val textColor = uiState.textColor?.let { Color(it) }
                     ?: MaterialTheme.colorScheme.primary
                 TextScreen(
-                    tfValue = uiState.tfValue,
+                    initialTFVState = initialTFVState,
                     fontSize = uiState.fontSize,
                     textColor = textColor,
                     readOnly = when (uiState.contentStatus) {
                         ContentStatus.LOADING -> true
                         else -> false
                     },
-                    setTFValue = setTFValue,
+                    onNewTFValue = onNewTFValue,
                 )
             }
         }
@@ -301,7 +302,7 @@ private fun HomeScreenPreview() {
         HomeScreen(
             uiState = UiState(
                 contentStatus = ContentStatus.SYNCED,
-                tfValue = TextFieldValue("hi!!!!!"),
+                initialText = "hi!!!!!",
                 fontSize = 30,
             ),
             backgroundImageUri = null,

@@ -24,11 +24,13 @@ import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import com.pierbezuhoff.justtext.encryptedDataStore
+import com.pierbezuhoff.justtext.stateInWhileSubscribed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,30 +38,26 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+private const val DEFAULT_TEXT = "Welcome!"
+private const val DEFAULT_FONT_SIZE = 18
+private const val DEFAULT_IS_LOCAL = true
+val PERIODIC_SAVE_DELAY = 3.minutes
+
 /**
- * @param[textSourceId] monotonically increasing sequence, increment
- * invalidates the text field and re-initializes it with [tfValue]
- * @param[tfValue] mirrored from the text field, changing it in [UiState]
- * doesn't do anything unless you also increment [textSourceId]
+ * @param[fontSize] main body text font size in `sp`
  */
 @Immutable
 data class UiState(
     val contentStatus: ContentStatus = ContentStatus.LOADING,
-    val isLocal: Boolean = true,
-    val textSourceId: Int = 0,
-    val tfValue: TextFieldValue =
-        TextFieldValue(DEFAULT_TEXT, TextRange(0)),
-    /** main body text font size in `sp` */
-    val fontSize: Int = 18,
+    val isLocal: Boolean = DEFAULT_IS_LOCAL,
+    val initialText: String = DEFAULT_TEXT,
+    val textSelection: TextRange = TextRange.Zero,
+    val fontSize: Int = DEFAULT_FONT_SIZE,
     // Color.value: ULong
     val textColor: ULong? = null,
     val textBackgroundColor: ULong? = null,
     val imageBackgroundColor: ULong? = null,
-) {
-    companion object {
-        private const val DEFAULT_TEXT = "Welcome!"
-    }
-}
+)
 
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
@@ -74,21 +72,47 @@ class HomeViewModel(
     val textCloudRepo: StateFlow<TextCloudRepo?>
         field = MutableStateFlow<TextCloudRepo?>(null)
 
-    // MAYBE: pipe dataStore updates directly into uiStateFlow, and modify dataStore data directly
-    val uiState: StateFlow<UiState>
-        field = MutableStateFlow(UiState(
-            contentStatus = ContentStatus.LOADING,
-        ))
+    /** initial texts, update each load */
+    private val initialText = MutableStateFlow(DEFAULT_TEXT)
+    /** TFV from the text field state, used for saving */
+    private val currentTextField = MutableStateFlow(TextFieldValue(DEFAULT_TEXT))
+
+    private val contentStatus = MutableStateFlow(ContentStatus.LOADING)
+
+    val encryptedData: Flow<EncryptedData> = encryptedDataStore.data
+
+    val uiState = combine(
+        dataStore.data, initialText, contentStatus
+    ) { preferences, initialText, contentStatus ->
+        val imageBackgroundColor = preferences[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()
+        val textBackgroundColor = preferences[TEXT_BACKGROUND_COLOR_KEY]?.toULong()
+        val textColor = preferences[TEXT_COLOR_KEY]?.toULong()
+        val cursorLocation = preferences[CURSOR_LOCATION_KEY]
+        val fontSize = preferences[FONT_SIZE_KEY]
+        val isLocal = preferences[IS_LOCAL_KEY]
+        val selection =
+            if (cursorLocation == null)
+                TextRange.Zero
+            else
+                TextRange(cursorLocation)
+        UiState(
+            contentStatus = contentStatus,
+            isLocal = isLocal ?: DEFAULT_IS_LOCAL,
+            initialText = initialText,
+            textSelection = selection,
+            fontSize = fontSize ?: DEFAULT_FONT_SIZE,
+            textColor = textColor,
+            textBackgroundColor = textBackgroundColor,
+            imageBackgroundColor = imageBackgroundColor,
+        )
+    }.stateInWhileSubscribed(UiState())
 
     val backgroundImageUri: StateFlow<TaggedUri?>
         field = MutableStateFlow<TaggedUri?>(null)
 
-    val encryptedDataFlow: Flow<EncryptedData> = encryptedDataStore.data
-
     init {
         viewModelScope.launch {
             loadBackgroundImageFromFile()
-            loadDataStoreData() // sets isLocal
             loadEncryptedDataStoreData()
             if (uiState.value.isLocal)
                 loadTextFromFile()
@@ -98,66 +122,32 @@ class HomeViewModel(
         }
     }
 
-    private fun loadTextFromFile() {
+    private suspend fun loadTextFromFile() {
         textFileRepo.load()
             .onSuccess { text ->
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.SYNCED,
-                    isLocal = true,
-                    textSourceId = it.textSourceId + 1,
-                    tfValue = TextFieldValue(text, it.tfValue.selection),
-                ) }
+                initialText.update { text }
+                // we upd current TFV here so that it won't be marked as Unsaved/changed
+                // when the text field receives it
+                currentTextField.update { TextFieldValue(text) }
+                contentStatus.update { ContentStatus.SYNCED }
+//                println("text file loaded: $text")
             }.onFailure {
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.LOADING_FAILED
-                ) }
+                contentStatus.update { ContentStatus.LOADING_FAILED }
             }
     }
 
     private suspend fun loadTextFromCloud() {
         textCloudRepo.value?.pull()
             ?.onSuccess { text ->
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.SYNCED,
-                    isLocal = false,
-                    textSourceId = it.textSourceId + 1,
-                    tfValue = TextFieldValue(text, it.tfValue.selection),
-                ) }
-            }.also { savingResult ->
-                if (savingResult?.isSuccess != true) {
-                    uiState.update { it.copy(
-                        contentStatus = ContentStatus.LOADING_FAILED
-                    ) }
+                initialText.update { text }
+                currentTextField.update { TextFieldValue(text) }
+                contentStatus.update { ContentStatus.SYNCED }
+//                println("cloud text loaded: $text")
+            }.also { pullResult ->
+                if (pullResult?.isSuccess != true) {
+                    contentStatus.update { ContentStatus.LOADING_FAILED }
                 }
             }
-    }
-
-    // assumption: dataStore has just been loaded
-    private suspend fun loadDataStoreData() {
-        // .firstOrNull assumes that data flow has 0 or 1 entries
-        // otherwise we are getting the oldest one which might be undesirable
-        dataStore.data.firstOrNull()?.let { data ->
-            val imageBackgroundColor = data[IMAGE_BACKGROUND_COLOR_KEY]?.toULong()
-            val textBackgroundColor = data[TEXT_BACKGROUND_COLOR_KEY]?.toULong()
-            val textColor = data[TEXT_COLOR_KEY]?.toULong()
-            val cursorLocation = data[CURSOR_LOCATION_KEY]
-            val fontSize = data[FONT_SIZE_KEY]
-            val isLocal = data[IS_LOCAL_KEY]
-            uiState.update { it.copy(
-                isLocal = isLocal ?: true,
-                tfValue = if (cursorLocation == null) {
-                    it.tfValue
-                } else {
-                    it.tfValue.copy(
-                        selection = TextRange(cursorLocation)
-                    )
-                },
-                fontSize = fontSize ?: it.fontSize,
-                textColor = textColor ?: it.textColor,
-                textBackgroundColor = textBackgroundColor ?: it.textBackgroundColor,
-                imageBackgroundColor = imageBackgroundColor ?: it.imageBackgroundColor,
-            ) }
-        }
     }
 
     private suspend fun loadEncryptedDataStoreData() {
@@ -177,49 +167,43 @@ class HomeViewModel(
         }
     }
 
-    private fun markSaved() {
-        uiState.update { it.copy(
-            contentStatus = ContentStatus.SYNCED
-        ) }
-    }
-
-    private fun markUnsaved() {
-        uiState.update { it.copy(
-            contentStatus = ContentStatus.UNSAVED
-        ) }
-    }
-
     fun setFontSize(fontSize: Int) {
-        uiState.update { it.copy(
-            fontSize = fontSize
-        ) }
+        viewModelScope.launch {
+            dataStore.edit {
+                it[FONT_SIZE_KEY] = fontSize
+            }
+        }
     }
 
     fun setTextColor(color: Color) {
-        uiState.update { it.copy(
-            textColor = color.value
-        ) }
+        viewModelScope.launch {
+            dataStore.edit {
+                it[TEXT_COLOR_KEY] = color.value.toLong()
+            }
+        }
     }
 
     fun setTextBackgroundColor(color: Color) {
-        uiState.update { it.copy(
-            textBackgroundColor = color.value
-        ) }
+        viewModelScope.launch {
+            dataStore.edit {
+                it[TEXT_BACKGROUND_COLOR_KEY] = color.value.toLong()
+            }
+        }
     }
 
     fun setImageBackgroundColor(color: Color) {
-        uiState.update { it.copy(
-            imageBackgroundColor = color.value
-        ) }
+        viewModelScope.launch {
+            dataStore.edit {
+                it[IMAGE_BACKGROUND_COLOR_KEY] = color.value.toLong()
+            }
+        }
     }
 
-    fun setTFValue(newTFValue: TextFieldValue) {
-        if (newTFValue.text != uiState.value.tfValue.text) {
-            markUnsaved()
+    fun onNewTFValue(newTFValue: TextFieldValue) {
+        if (newTFValue.text != currentTextField.value.text) {
+            contentStatus.update { ContentStatus.UNSAVED }
         }
-        uiState.update { it.copy(
-            tfValue = newTFValue
-        ) }
+        currentTextField.update { newTFValue }
     }
 
     fun setBackgroundImage(uri: Uri) {
@@ -243,16 +227,13 @@ class HomeViewModel(
 
     private fun switchTextSourceToCloud() {
         if (textCloudRepo.value != null) {
+            val currentText = currentTextField.value.text
             viewModelScope.launch {
-                if (uiState.value.contentStatus == ContentStatus.UNSAVED) {
-                    uiState.update { it.copy(
-                        contentStatus = ContentStatus.SAVING,
-                    ) }
-                    saveTextToFile()
+                if (contentStatus.value == ContentStatus.UNSAVED) {
+                    contentStatus.update { ContentStatus.SAVING }
+                    saveTextToFile(currentText)
                 }
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.LOADING,
-                ) }
+                contentStatus.update { ContentStatus.LOADING }
                 loadTextFromCloud()
             }
         } else {
@@ -262,18 +243,16 @@ class HomeViewModel(
 
     private fun switchTextSourceToLocal() {
         // we have to snapshot current text, otherwise it can save text loaded from file...
-        val text = uiState.value.tfValue.text
+        val currentText = currentTextField.value.text
         viewModelScope.launch {
-            if (uiState.value.contentStatus == ContentStatus.UNSAVED) {
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.SAVING,
-                ) }
+            if (contentStatus.value == ContentStatus.UNSAVED) {
+                contentStatus.update { ContentStatus.SAVING }
                 launch(Dispatchers.Default) {
-                    saveTextToCloud(text)
+                    saveTextToCloud(currentText)
                 }
             }
+            loadTextFromFile()
         }
-        loadTextFromFile()
     }
 
     fun switchTextSource() {
@@ -285,8 +264,7 @@ class HomeViewModel(
     }
 
     fun save() {
-        val uiState0 = uiState.value
-        when (uiState0.contentStatus) {
+        when (contentStatus.value) {
             ContentStatus.SYNCED,
             ContentStatus.LOADING, ContentStatus.LOADING_FAILED,
             ContentStatus.SAVING -> {
@@ -294,30 +272,23 @@ class HomeViewModel(
             }
             // unsaved, saving failed
             else -> viewModelScope.launch {
-                uiState.update { it.copy(
-                    contentStatus = ContentStatus.SAVING
-                ) }
-                saveDatastoreData()
+                contentStatus.update { ContentStatus.SAVING }
                 val saveResult =
-                    if (uiState0.isLocal) {
+                    if (uiState.value.isLocal) {
                         saveTextToFile()
                     } else {
                         saveTextToCloud()
                     }
                 saveResult.fold(
                     onSuccess = {
-                        markSaved()
+                        contentStatus.update { ContentStatus.SYNCED }
                     },
                     onFailure = { e ->
-                        uiState.update { it.copy(
-                            contentStatus = ContentStatus.SAVING_FAILED
-                        ) }
+                        contentStatus.update { ContentStatus.SAVING_FAILED }
                         e.printStackTrace()
                         launch {
                             delay(3.seconds)
-                            uiState.update { it.copy(
-                                contentStatus = ContentStatus.UNSAVED
-                            ) }
+                            contentStatus.update { ContentStatus.UNSAVED }
                         }
                     }
                 )
@@ -328,60 +299,32 @@ class HomeViewModel(
     /** same as [save] but uses runBlocking for coroutines */
     fun persistState() {
         println("persist state")
-        val saveResult = when (uiState.value.contentStatus ) {
+        val saveResult = when (contentStatus.value) {
             ContentStatus.SYNCED ->
                 Result.success(Unit)
             ContentStatus.LOADING, ContentStatus.LOADING_FAILED, ContentStatus.SAVING ->
                 Result.failure(Error("Bad state for persisting text"))
             // unsaved, saving failed
-            else -> when {
-                uiState.value.isLocal ->
+            else -> runBlocking {
+                if (uiState.value.isLocal)
                     saveTextToFile()
-                else -> runBlocking {
+                else
                     saveTextToCloud()
-                }
             }
-        }
-        runBlocking {
-            saveDatastoreData()
         }
         saveResult.onSuccess {
-            markSaved()
+            contentStatus.update { ContentStatus.SYNCED }
         }
     }
 
-    private suspend fun saveDatastoreData() {
-        val uiState = uiState.value
-        dataStore.edit { preferences ->
-            uiState.textColor?.let { color ->
-                preferences[TEXT_COLOR_KEY] = color.toLong()
-            }
-            uiState.textBackgroundColor?.let { color ->
-                preferences[TEXT_BACKGROUND_COLOR_KEY] = color.toLong()
-            }
-            uiState.imageBackgroundColor?.let { color ->
-                preferences[IMAGE_BACKGROUND_COLOR_KEY] = color.toLong()
-            }
-            uiState.tfValue.selection.start.let { cursorLocation ->
-                preferences[CURSOR_LOCATION_KEY] = cursorLocation
-            }
-            uiState.fontSize.let { fontSize ->
-                preferences[FONT_SIZE_KEY] = fontSize
-            }
-            uiState.isLocal.let { isLocal ->
-                preferences[IS_LOCAL_KEY] = isLocal
-            }
-        }
-    }
-
-    private fun saveTextToFile(
-        text: String = uiState.value.tfValue.text,
+    private suspend fun saveTextToFile(
+        text: String = currentTextField.value.text,
     ): Result<Unit> {
         return textFileRepo.save(text)
     }
 
     private suspend fun saveTextToCloud(
-        text: String = uiState.value.tfValue.text,
+        text: String = currentTextField.value.text,
     ): Result<Unit> {
         val repo = textCloudRepo.value
             ?: return Result.failure(Error("No cloud repo"))
@@ -417,9 +360,6 @@ class HomeViewModel(
                 ) as T
             }
         }
-
-        val PERIODIC_SAVE_DELAY = 3.minutes
-        private const val SKIP_TO_THE_END_OF_NEW_TEXT = false
 
         private val CURSOR_LOCATION_KEY = intPreferencesKey("cursor_location")
         private val FONT_SIZE_KEY = intPreferencesKey("font_size")
