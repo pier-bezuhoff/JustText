@@ -16,6 +16,8 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.getTextAfterSelection
+import androidx.compose.ui.text.input.getTextBeforeSelection
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 
+private data object SelectLineKey
 private data object DeleteSelectionKey
 
 // MAYBE: migrate to TextFieldState for proper Delete context action
@@ -61,6 +64,20 @@ fun TextScreen(
         modifier = modifier
             .padding(start = startPadding, end = endPadding)
             .appendTextContextMenuComponents {
+                item(SelectLineKey, "Select line") {
+                    val min = tfValue.selection.min
+                    val max = tfValue.selection.max
+                    val previousLineBreak = tfValue.text.withIndex().lastOrNull { (i, char) ->
+                        i <= min && char == '\n'
+                    }?.index ?: -1
+                    val nextLineBreak = tfValue.text.withIndex().firstOrNull { (i, char) ->
+                        i >= max && char == '\n'
+                    }?.index ?: tfValue.text.length
+                    val newSelection = TextRange(previousLineBreak + 1, nextLineBreak)
+                    setTFValue(tfValue.copy(
+                        selection = newSelection
+                    ))
+                }
                 if (!readOnly) {
                     separator()
                     item(DeleteSelectionKey, "Delete") {
@@ -71,15 +88,16 @@ fun TextScreen(
                         //  built-in Cut is defined as
                         //  `textFieldState.deleteSelectedText()` + add result to clipboard
 //                    println("Delete context-action ${tfValue.selection} / comp ${tfValue.composition}")
-                        val range = tfValue.selection
-                        val text = tfValue.text
-                        val newText = text.removeRange(range.min, range.max)
-                        setTFValue(
-                            TextFieldValue(
-                                text = newText,
-                                selection = TextRange(range.min)
-                            )
+                        // this is the same way built-in Cut is implemented in TextFieldSelectionManager
+                        val newText =
+                            tfValue.getTextBeforeSelection(tfValue.text.length) +
+                            tfValue.getTextAfterSelection(tfValue.text.length)
+                        val newCursorOffset = tfValue.selection.min
+                        val newValue = TextFieldValue(
+                            annotatedString = newText,
+                            selection = TextRange(newCursorOffset, newCursorOffset),
                         )
+                        setTFValue(newValue)
                         close()
                     }
                 }

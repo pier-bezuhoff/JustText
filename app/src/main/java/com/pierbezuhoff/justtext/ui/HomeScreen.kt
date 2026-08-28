@@ -82,8 +82,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
@@ -92,12 +94,16 @@ import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
 import com.pierbezuhoff.justtext.data.TextCloudRepo
-import com.pierbezuhoff.justtext.data.runCatchingOnlyNet
+import com.pierbezuhoff.justtext.ui.HomeViewModel.Companion.PERIODIC_SAVE_DELAY
 import com.pierbezuhoff.justtext.ui.dialogs.ColorsDialog
 import com.pierbezuhoff.justtext.ui.dialogs.DialogType
 import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 // MAYBE: add quick in-text search button
 @Suppress("ParamsComparedByRef")
@@ -107,7 +113,9 @@ fun HomeScreenRoot(
     quitApp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+    val pickMedia = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
         if (uri != null) {
             viewModel.setBackgroundImage(uri)
         } else {
@@ -118,16 +126,16 @@ fun HomeScreenRoot(
     val backgroundImageUri: TaggedUri? by viewModel.backgroundImageUri.collectAsStateWithLifecycle()
     val encryptedData by viewModel.encryptedDataFlow.collectAsStateWithLifecycle(EncryptedData())
     var openedDialogType: DialogType? by remember { mutableStateOf(null) }
-    val snackbar = remember { SnackbarHostState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     HomeScreen(
         uiState = uiState,
         backgroundImageUri = backgroundImageUri,
         encryptedData = encryptedData,
         modifier = modifier,
-        snackbarHostState = snackbar,
+        snackbarHostState = snackbarHostState,
         quitApp = {
             viewModel.persistState()
-            viewModel.clearResources()
+            viewModel.freeResources()
             quitApp()
         },
         save = viewModel::save,
@@ -136,7 +144,9 @@ fun HomeScreenRoot(
         openFontSizeDialog = { openedDialogType = DialogType.FONT_SIZE },
         openColorsDialog = { openedDialogType = DialogType.COLORS },
         openBackgroundImagePicker = {
-            pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            pickMedia.launch(PickVisualMediaRequest(
+                ActivityResultContracts.PickVisualMedia.ImageOnly
+            ))
         },
         setTFValue = viewModel::setTFValue,
     )
@@ -180,23 +190,18 @@ fun HomeScreenRoot(
         }
         null -> {}
     }
-//    val repo by viewModel.textCloudRepo.collectAsStateWithLifecycle()
-//    LaunchedEffect(repo) {
-//        if (repo != null) {
-//            println("started pull 1")
-//            repo?.pull()
-//            println("pull 1 done")
-//            encryptedData.let {
-//                if (it.noteEndpoint != null && it.notePassword != null) {
-//                    runCatching {
-//                        TextCloudRepo(it.noteEndpoint, it.notePassword).pull()
-//                    }
-//                } else null
-//            }
-////            repo?.pull()
-//            println("pull 2 done")
-//        }
-//    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            withContext(Dispatchers.Default) {
+                while (isActive) {
+                    println("periodic save")
+                    delay(PERIODIC_SAVE_DELAY)
+                    viewModel.save()
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -281,8 +286,7 @@ fun HomeScreen(
                     readOnly = when (uiState.contentStatus) {
                         ContentStatus.LOADING -> true
                         else -> false
-                    }
-                    ,
+                    },
                     setTFValue = setTFValue,
                 )
             }
@@ -341,7 +345,7 @@ private fun TopBar(
     openColorsDialog: () -> Unit = {},
     openBackgroundImagePicker: () -> Unit = {},
 ) {
-    var showTextSourceProperitesPopup: Boolean by remember { mutableStateOf(false) }
+    var showTextSourcePropertiesPopup: Boolean by remember { mutableStateOf(false) }
     TopAppBar(
         navigationIcon = {
             IconButton(onClick = quitApp) {
@@ -397,14 +401,14 @@ private fun TopBar(
                     isLocal = isLocal,
                     switchTextSource = switchTextSource,
                     openTextSourceProperties = {
-                        showTextSourceProperitesPopup = !showTextSourceProperitesPopup
+                        showTextSourcePropertiesPopup = !showTextSourcePropertiesPopup
                     },
                 )
-                if (showTextSourceProperitesPopup) {
+                if (showTextSourcePropertiesPopup) {
                     TextSourcePropertiesPopup(
                         initialEndpoint = encryptedData.noteEndpoint ?: "example.com",
                         initialPassword = "", // you could show it but
-                        dismiss = { showTextSourceProperitesPopup = false },
+                        dismiss = { showTextSourcePropertiesPopup = false },
                         setCloudRepoProperties = {
                             setCloudRepoProperties(it)
                             if (isLocal)

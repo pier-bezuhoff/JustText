@@ -26,6 +26,10 @@ import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlin.io.encoding.Base64
 
+/**
+ * @param[password] if it's empty the text is sent untransformed,
+ * otherwise the text is encrypted and then encoded as base 64 before sending
+ */
 class TextCloudRepo(
     private val endpoint: String,
     private val password: String,
@@ -37,7 +41,8 @@ class TextCloudRepo(
     )
 
     constructor(properties: Properties) : this(
-        properties.endpoint, properties.password
+        properties.endpoint,
+        properties.password
     )
 
     val client: HttpClient = HttpClient(Android) {
@@ -94,21 +99,31 @@ class TextCloudRepo(
         return get()
             .flatMapCatchingOnly({
                 it is IllegalArgumentException || it is IndexOutOfBoundsException
-            }) { base64 ->
-                val encryptedPackage = Base64.decode(base64)
-                TextEncryption.decryptWithPassword(encryptedPackage, password)
+            }) { bytes ->
+                if (password.isEmpty()) {
+                    Result.success(
+                        bytes.decodeToString()
+                    )
+                } else {
+                    val encryptedPackage = Base64.decode(bytes)
+                    TextEncryption.decryptWithPassword(encryptedPackage, password)
+                }
             }
     }
 
     suspend fun push(text: String): Result<Unit> {
-        return TextEncryption.encryptWithPassword(text, password)
-            .flatMapCatchingOnly({
-                it is IllegalArgumentException || it is IndexOutOfBoundsException
-            }) { encryptedPackage ->
-                val base64 = Base64.encode(encryptedPackage)
-                post(base64)
+        return if (password.isEmpty()) {
+            post(text)
+        } else {
+            TextEncryption.encryptWithPassword(text, password)
+                .flatMapCatchingOnly({
+                    it is IllegalArgumentException || it is IndexOutOfBoundsException
+                }) { encryptedPackage ->
+                    val base64 = Base64.encode(encryptedPackage)
+                    post(base64)
 //                Result.success(Unit)
-            }
+                }
+        }
     }
 }
 

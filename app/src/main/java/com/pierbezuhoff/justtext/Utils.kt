@@ -1,8 +1,14 @@
 package com.pierbezuhoff.justtext
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +24,27 @@ fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
         started = SharingStarted.WhileSubscribed(5_000L),
         initialValue = initialValue,
     )
+
+// NOTE: alternatively use .flowWithLifecycle() inside LaunchedEffect
+@Suppress("ComposableNaming")
+@Composable
+inline fun <T> Flow<T>?.collectWithLifecycle(
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+    crossinline onEvent: suspend CoroutineScope.(T) -> Unit,
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(this, lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(minActiveState) {
+            // switching to Main.immediate prevents losing events in very rare cases
+            // during configuration changes (default is Dispatchers.Main), idc tho
+//            withContext(Dispatchers.Main.immediate) {
+            this@collectWithLifecycle?.collect { event ->
+                onEvent(event)
+            }
+//            }
+        }
+    }
+}
 
 /** alternative to [runCatching], but only catching exceptions satisfying
  * [catchFilter], non-cancellation exceptions by default */

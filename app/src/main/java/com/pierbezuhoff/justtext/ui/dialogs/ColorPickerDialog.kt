@@ -70,6 +70,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.flowWithLifecycle
 import androidx.window.core.layout.WindowHeightSizeClass
 import androidx.window.core.layout.WindowWidthSizeClass
 import com.github.ajalt.colormath.RenderCondition
@@ -446,13 +448,16 @@ private fun HexInput(
     )
     // NOTE: this (no focus by default on Android) fix only works 90% of time...
     // reference: https://stackoverflow.com/q/71412537/7143065
-    LaunchedEffect(windowInfo) {
-        snapshotFlow { windowInfo.isWindowFocused }.collect { isWindowFocused ->
-            if (isWindowFocused) { // runs once every time the dialog is opened
-                focusRequester.freeFocus()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(windowInfo, lifecycleOwner.lifecycle) {
+        snapshotFlow { windowInfo.isWindowFocused }
+            .flowWithLifecycle(lifecycleOwner.lifecycle)
+            .collect { isWindowFocused ->
+                if (isWindowFocused) { // runs once every time the dialog is opened
+                    focusRequester.freeFocus()
 //                focusRequester.requestFocus(FocusDirection.Exit)
-                keyboard?.hide() // suppresses rare auto-showing keyboard bug
+                    keyboard?.hide() // suppresses rare auto-showing keyboard bug
+                }
             }
-        }
     }
 }

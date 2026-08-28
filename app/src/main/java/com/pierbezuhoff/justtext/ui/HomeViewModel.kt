@@ -1,6 +1,7 @@
 package com.pierbezuhoff.justtext.ui
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -24,7 +25,6 @@ import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import com.pierbezuhoff.justtext.encryptedDataStore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +36,31 @@ import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * @param[textSourceId] monotonically increasing sequence, increment
+ * invalidates the text field and re-initializes it with [tfValue]
+ * @param[tfValue] mirrored from the text field, changing it in [UiState]
+ * doesn't do anything unless you also increment [textSourceId]
+ */
+@Immutable
+data class UiState(
+    val contentStatus: ContentStatus = ContentStatus.LOADING,
+    val isLocal: Boolean = true,
+    val textSourceId: Int = 0,
+    val tfValue: TextFieldValue =
+        TextFieldValue(DEFAULT_TEXT, TextRange(0)),
+    /** main body text font size in `sp` */
+    val fontSize: Int = 18,
+    // Color.value: ULong
+    val textColor: ULong? = null,
+    val textBackgroundColor: ULong? = null,
+    val imageBackgroundColor: ULong? = null,
+) {
+    companion object {
+        private const val DEFAULT_TEXT = "Welcome!"
+    }
+}
+
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via dataStore
@@ -46,10 +71,10 @@ class HomeViewModel(
     private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : AndroidViewModel(application) {
-    // alternatively we could fuse textFlow, datastore.data flow and transientUIStateFlow into uiStateFlow
     val textCloudRepo: StateFlow<TextCloudRepo?>
         field = MutableStateFlow<TextCloudRepo?>(null)
 
+    // MAYBE: pipe dataStore updates directly into uiStateFlow, and modify dataStore data directly
     val uiState: StateFlow<UiState>
         field = MutableStateFlow(UiState(
             contentStatus = ContentStatus.LOADING,
@@ -60,10 +85,6 @@ class HomeViewModel(
 
     val encryptedDataFlow: Flow<EncryptedData> = encryptedDataStore.data
 
-
-    private val periodicSaveIsOn = MutableStateFlow(false)
-    private var periodicSaveJob: Job? = null
-
     init {
         viewModelScope.launch {
             loadBackgroundImageFromFile()
@@ -73,9 +94,7 @@ class HomeViewModel(
                 loadTextFromFile()
             else
                 loadTextFromCloud()
-            loadDataStoreData() // updates cursor location
             println("ViewModel loaded persistent data")
-            startPeriodicSave()
         }
     }
 
@@ -83,14 +102,10 @@ class HomeViewModel(
         textFileRepo.load()
             .onSuccess { text ->
                 uiState.update { it.copy(
-                    isLocal = true,
                     contentStatus = ContentStatus.SYNCED,
-                    tfValue = TextFieldValue(text, TextRange(
-                        if (SKIP_TO_THE_END_OF_NEW_TEXT)
-                            text.length
-                        else
-                            0
-                    )),
+                    isLocal = true,
+                    textSourceId = it.textSourceId + 1,
+                    tfValue = TextFieldValue(text, it.tfValue.selection),
                 ) }
             }.onFailure {
                 uiState.update { it.copy(
@@ -103,14 +118,10 @@ class HomeViewModel(
         textCloudRepo.value?.pull()
             ?.onSuccess { text ->
                 uiState.update { it.copy(
-                    isLocal = false,
                     contentStatus = ContentStatus.SYNCED,
-                    tfValue = TextFieldValue(text, TextRange(
-                        if (SKIP_TO_THE_END_OF_NEW_TEXT)
-                            text.length
-                        else
-                            0
-                    )),
+                    isLocal = false,
+                    textSourceId = it.textSourceId + 1,
+                    tfValue = TextFieldValue(text, it.tfValue.selection),
                 ) }
             }.also { savingResult ->
                 if (savingResult?.isSuccess != true) {
@@ -220,6 +231,16 @@ class HomeViewModel(
         }
     }
 
+    fun setCloudRepoProperties(properties: TextCloudRepo.Properties) {
+        textCloudRepo.update { TextCloudRepo(properties) }
+        viewModelScope.launch {
+            encryptedDataStore.updateData { it.copy(
+                noteEndpoint = properties.endpoint,
+                notePassword = properties.password,
+            ) }
+        }
+    }
+
     private fun switchTextSourceToCloud() {
         if (textCloudRepo.value != null) {
             viewModelScope.launch {
@@ -263,16 +284,6 @@ class HomeViewModel(
         }
     }
 
-    fun setCloudRepoProperties(properties: TextCloudRepo.Properties) {
-        textCloudRepo.update { TextCloudRepo(properties) }
-        viewModelScope.launch {
-            encryptedDataStore.updateData { it.copy(
-                noteEndpoint = properties.endpoint,
-                notePassword = properties.password,
-            ) }
-        }
-    }
-
     fun save() {
         val uiState0 = uiState.value
         when (uiState0.contentStatus) {
@@ -312,24 +323,6 @@ class HomeViewModel(
                 )
             }
         }
-    }
-
-    private fun startPeriodicSave() {
-        if (!periodicSaveIsOn.value) {
-            periodicSaveIsOn.update { true }
-            periodicSaveJob = viewModelScope.launch(Dispatchers.Default) {
-                while (true) {
-                    println("periodic save")
-                    delay(PERIODIC_SAVE_DELAY)
-                    save()
-                }
-            }
-        }
-    }
-
-    private fun stopPeriodicSave() {
-        periodicSaveJob?.cancel()
-        periodicSaveIsOn.update { false }
     }
 
     /** same as [save] but uses runBlocking for coroutines */
@@ -383,8 +376,9 @@ class HomeViewModel(
 
     private fun saveTextToFile(
         text: String = uiState.value.tfValue.text,
-    ): Result<Unit> =
-        textFileRepo.save(text)
+    ): Result<Unit> {
+        return textFileRepo.save(text)
+    }
 
     private suspend fun saveTextToCloud(
         text: String = uiState.value.tfValue.text,
@@ -394,14 +388,13 @@ class HomeViewModel(
         return repo.push(text)
     }
 
-    fun clearResources() {
-        stopPeriodicSave()
+    fun freeResources() {
         textCloudRepo.value?.client?.close()
     }
 
     override fun onCleared() {
         println("VM.onCleared")
-        clearResources()
+        freeResources()
     }
 
     companion object {
@@ -425,7 +418,7 @@ class HomeViewModel(
             }
         }
 
-        private val PERIODIC_SAVE_DELAY = 3.minutes
+        val PERIODIC_SAVE_DELAY = 3.minutes
         private const val SKIP_TO_THE_END_OF_NEW_TEXT = false
 
         private val CURSOR_LOCATION_KEY = intPreferencesKey("cursor_location")
