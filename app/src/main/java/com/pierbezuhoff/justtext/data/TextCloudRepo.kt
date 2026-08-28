@@ -48,7 +48,7 @@ class TextCloudRepo(
         properties.password
     )
 
-    val client: HttpClient = HttpClient(Android) {
+    private val client: HttpClient = HttpClient(Android) {
         install(Logging) {
             logger = Logger.ANDROID
             level = LogLevel.HEADERS
@@ -127,9 +127,13 @@ class TextCloudRepo(
                 }
         }
     }
+
+    fun freeResources() {
+        client.close()
+    }
 }
 
-inline fun <T, R> T.runCatchingOnlyNet(
+private inline fun <T, R> T.runCatchingOnlyNet(
     block: T.() -> R,
 ): Result<R> {
     return try {

@@ -194,8 +194,8 @@ fun HomeScreenRoot(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             withContext(Dispatchers.Default) {
                 while (isActive) {
-                    delay(PERIODIC_SAVE_DELAY)
-                    println("periodic save")
+                    delay(AUTOSAVE_PERIOD)
+                    println("periodic autosave")
                     viewModel.save()
                 }
             }

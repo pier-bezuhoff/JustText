@@ -41,7 +41,7 @@ import kotlin.time.Duration.Companion.seconds
 private const val DEFAULT_TEXT = "Welcome!"
 private const val DEFAULT_FONT_SIZE = 18
 private const val DEFAULT_IS_LOCAL = true
-val PERIODIC_SAVE_DELAY = 3.minutes
+val AUTOSAVE_PERIOD = 3.minutes
 
 /**
  * @param[fontSize] main body text font size in `sp`
@@ -61,7 +61,7 @@ data class UiState(
 
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
-//  so the important elements of UiState are saved via dataStore
+//  so the important elements of UiState are saved via text file & dataStore
 class HomeViewModel(
     application: JustTextApplication,
     private val dataStore: DataStore<Preferences>,
@@ -69,6 +69,7 @@ class HomeViewModel(
     private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : AndroidViewModel(application) {
+    // maybe unify textFileRepo & textCloudRepo with same interface
     val textCloudRepo: StateFlow<TextCloudRepo?>
         field = MutableStateFlow<TextCloudRepo?>(null)
 
@@ -113,7 +114,7 @@ class HomeViewModel(
     init {
         viewModelScope.launch {
             loadBackgroundImageFromFile()
-            loadEncryptedDataStoreData()
+            loadEncryptedDataToInitTextCloudRepo()
             if (uiState.value.isLocal)
                 loadTextFromFile()
             else
@@ -150,12 +151,11 @@ class HomeViewModel(
             }
     }
 
-    private suspend fun loadEncryptedDataStoreData() {
-        encryptedDataStore.data.firstOrNull()?.let { data ->
-            val (endpoint, password) = data
-            if (endpoint != null && password != null) {
+    private suspend fun loadEncryptedDataToInitTextCloudRepo() {
+        encryptedData.firstOrNull()?.let { data ->
+            if (data.noteEndpoint != null && data.notePassword != null) {
                 textCloudRepo.update {
-                    TextCloudRepo(endpoint, password)
+                    TextCloudRepo(data.noteEndpoint, data.notePassword)
                 }
             }
         }
@@ -231,6 +231,7 @@ class HomeViewModel(
             viewModelScope.launch {
                 if (contentStatus.value == ContentStatus.UNSAVED) {
                     contentStatus.update { ContentStatus.SAVING }
+                    // saving locally is much faster, so no parallel
                     saveTextToFile(currentText)
                 }
                 contentStatus.update { ContentStatus.LOADING }
@@ -270,7 +271,7 @@ class HomeViewModel(
             ContentStatus.SAVING -> {
                 println("saving skipped")
             }
-            // unsaved, saving failed
+            // unsaved | saving failed
             else -> viewModelScope.launch {
                 contentStatus.update { ContentStatus.SAVING }
                 val saveResult =
@@ -332,7 +333,7 @@ class HomeViewModel(
     }
 
     fun freeResources() {
-        textCloudRepo.value?.client?.close()
+        textCloudRepo.value?.freeResources()
     }
 
     override fun onCleared() {
