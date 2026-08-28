@@ -127,9 +127,7 @@ class HomeViewModel(
         textFileRepo.load()
             .onSuccess { text ->
                 initialText.update { text }
-                // we upd current TFV here so that it won't be marked as Unsaved/changed
-                // when the text field receives it
-                currentTextField.update { TextFieldValue(text) }
+                setIsLocal(true)
                 contentStatus.update { ContentStatus.SYNCED }
 //                println("text file loaded: $text")
             }.onFailure {
@@ -141,9 +139,9 @@ class HomeViewModel(
         textCloudRepo.value?.pull()
             ?.onSuccess { text ->
                 initialText.update { text }
-                currentTextField.update { TextFieldValue(text) }
+                setIsLocal(false)
                 contentStatus.update { ContentStatus.SYNCED }
-//                println("cloud text loaded: $text")
+//                println("cloud text loaded: $text"("cloud text loaded: $text"))
             }.also { pullResult ->
                 if (pullResult?.isSuccess != true) {
                     contentStatus.update { ContentStatus.LOADING_FAILED }
@@ -199,11 +197,30 @@ class HomeViewModel(
         }
     }
 
+    private fun setIsLocal(isLocal: Boolean) {
+        viewModelScope.launch {
+            dataStore.edit {
+                it[IS_LOCAL_KEY] = isLocal
+            }
+        }
+    }
+
+    private fun setCursorLocation(cursorLocation: Int) {
+        viewModelScope.launch {
+            dataStore.edit {
+                it[CURSOR_LOCATION_KEY] = cursorLocation
+            }
+        }
+    }
+
     fun onNewTFValue(newTFValue: TextFieldValue) {
-        if (newTFValue.text != currentTextField.value.text) {
+        if (newTFValue.text != currentTextField.value.text &&
+            newTFValue.text != initialText.value
+        ) {
             contentStatus.update { ContentStatus.UNSAVED }
         }
         currentTextField.update { newTFValue }
+        setCursorLocation(newTFValue.selection.start)
     }
 
     fun setBackgroundImage(uri: Uri) {
