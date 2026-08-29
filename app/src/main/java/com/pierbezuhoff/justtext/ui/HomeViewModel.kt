@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.IOException
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -24,6 +25,7 @@ import com.pierbezuhoff.justtext.data.TextCloudRepo
 import com.pierbezuhoff.justtext.data.TextFileRepo
 import com.pierbezuhoff.justtext.dataStore
 import com.pierbezuhoff.justtext.encryptedDataStore
+import com.pierbezuhoff.justtext.runCatchingOnly
 import com.pierbezuhoff.justtext.stateInWhileSubscribed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -35,10 +37,12 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-private const val DEFAULT_TEXT = "Welcome!"
+private const val LOADING_TEXT = "..."
+private const val GREETING_TEXT = "Welcome to JustText! Use it as you please."
 private const val DEFAULT_FONT_SIZE = 18
 private const val DEFAULT_IS_LOCAL = true
 val AUTOSAVE_PERIOD = 3.minutes
@@ -50,7 +54,7 @@ val AUTOSAVE_PERIOD = 3.minutes
 data class UiState(
     val contentStatus: ContentStatus = ContentStatus.LOADING,
     val isLocal: Boolean = DEFAULT_IS_LOCAL,
-    val initialText: String = DEFAULT_TEXT,
+    val initialText: String = LOADING_TEXT,
     val textSelection: TextRange = TextRange.Zero,
     val fontSize: Int = DEFAULT_FONT_SIZE,
     // Color.value: ULong
@@ -74,9 +78,9 @@ class HomeViewModel(
         field = MutableStateFlow<TextCloudRepo?>(null)
 
     /** initial texts, update each load */
-    private val initialText = MutableStateFlow(DEFAULT_TEXT)
+    private val initialText = MutableStateFlow(LOADING_TEXT)
     /** TFV from the text field state, used for saving */
-    private val currentTextField = MutableStateFlow(TextFieldValue(DEFAULT_TEXT))
+    private val currentTextField = MutableStateFlow(TextFieldValue(LOADING_TEXT))
 
     private val contentStatus = MutableStateFlow(ContentStatus.LOADING)
 
@@ -114,42 +118,67 @@ class HomeViewModel(
     init {
         viewModelScope.launch {
             loadBackgroundImageFromFile()
-            loadEncryptedDataToInitTextCloudRepo()
-            if (uiState.value.isLocal)
+            initializedTextCloudRepoFromEncryptedData()
+            val isLocal = dataStore.data.firstOrNull()?.get(IS_LOCAL_KEY) ?: DEFAULT_IS_LOCAL
+            val loadResult = if (isLocal)
                 loadTextFromFile()
             else
                 loadTextFromCloud()
+            loadResult.onFailure {
+                initialText.update { GREETING_TEXT }
+            }
             println("ViewModel loaded persistent data")
         }
     }
 
-    private suspend fun loadTextFromFile() {
+    private suspend fun <T> setDataStoreValue(
+        key: Preferences.Key<T>,
+        value: T,
+    ): Result<Preferences> =
+        runCatchingOnly({ it is IOException }) {
+            dataStore.edit {
+                it[key] = value
+            }
+        }
+
+    private suspend fun loadTextFromFile(
+        resetSelection: Boolean = false,
+    ): Result<String> =
         textFileRepo.load()
             .onSuccess { text ->
-                initialText.update { text }
-                setIsLocal(true)
+                if (resetSelection)
+                    setCursorLocation(0)
+                // ideally we want to upd initialText and isLocal together atomically
+                withContext(Dispatchers.Main.immediate) {
+                    setDataStoreValue(IS_LOCAL_KEY, true)
+                    initialText.update { text }
+                }
                 contentStatus.update { ContentStatus.SYNCED }
 //                println("text file loaded: $text")
             }.onFailure {
                 contentStatus.update { ContentStatus.LOADING_FAILED }
             }
-    }
 
-    private suspend fun loadTextFromCloud() {
+    private suspend fun loadTextFromCloud(
+        resetSelection: Boolean = false,
+    ): Result<String> =
         textCloudRepo.value?.pull()
-            ?.onSuccess { text ->
-                initialText.update { text }
-                setIsLocal(false)
+            .let { pullResult ->
+                pullResult ?: Result.failure(Error("No cloud repo"))
+            }.onSuccess { text ->
+                if (resetSelection)
+                    setCursorLocation(0)
+                withContext(Dispatchers.Main.immediate) {
+                    setDataStoreValue(IS_LOCAL_KEY, false)
+                    initialText.update { text }
+                }
                 contentStatus.update { ContentStatus.SYNCED }
 //                println("cloud text loaded: $text"("cloud text loaded: $text"))
-            }.also { pullResult ->
-                if (pullResult?.isSuccess != true) {
-                    contentStatus.update { ContentStatus.LOADING_FAILED }
-                }
+            }.onFailure {
+                contentStatus.update { ContentStatus.LOADING_FAILED }
             }
-    }
 
-    private suspend fun loadEncryptedDataToInitTextCloudRepo() {
+    private suspend fun initializedTextCloudRepoFromEncryptedData() {
         encryptedData.firstOrNull()?.let { data ->
             if (data.noteEndpoint != null && data.notePassword != null) {
                 textCloudRepo.update {
@@ -160,56 +189,39 @@ class HomeViewModel(
     }
 
     private fun loadBackgroundImageFromFile() {
-        backgroundImageRepo.load().getOrNull()?.let { newImage ->
-            backgroundImageUri.update { newImage }
-        }
+        backgroundImageRepo.load()
+            .onSuccess { uri ->
+                backgroundImageUri.update { uri }
+            }
     }
 
     fun setFontSize(fontSize: Int) {
         viewModelScope.launch {
-            dataStore.edit {
-                it[FONT_SIZE_KEY] = fontSize
-            }
+            setDataStoreValue(FONT_SIZE_KEY, fontSize)
         }
     }
 
     fun setTextColor(color: Color) {
         viewModelScope.launch {
-            dataStore.edit {
-                it[TEXT_COLOR_KEY] = color.value.toLong()
-            }
+            setDataStoreValue(TEXT_COLOR_KEY, color.value.toLong())
         }
     }
 
     fun setTextBackgroundColor(color: Color) {
         viewModelScope.launch {
-            dataStore.edit {
-                it[TEXT_BACKGROUND_COLOR_KEY] = color.value.toLong()
-            }
+            setDataStoreValue(TEXT_BACKGROUND_COLOR_KEY, color.value.toLong())
         }
     }
 
     fun setImageBackgroundColor(color: Color) {
         viewModelScope.launch {
-            dataStore.edit {
-                it[IMAGE_BACKGROUND_COLOR_KEY] = color.value.toLong()
-            }
-        }
-    }
-
-    private fun setIsLocal(isLocal: Boolean) {
-        viewModelScope.launch {
-            dataStore.edit {
-                it[IS_LOCAL_KEY] = isLocal
-            }
+            setDataStoreValue(IMAGE_BACKGROUND_COLOR_KEY, color.value.toLong())
         }
     }
 
     private fun setCursorLocation(cursorLocation: Int) {
         viewModelScope.launch {
-            dataStore.edit {
-                it[CURSOR_LOCATION_KEY] = cursorLocation
-            }
+            setDataStoreValue(CURSOR_LOCATION_KEY, cursorLocation)
         }
     }
 
@@ -220,7 +232,6 @@ class HomeViewModel(
             contentStatus.update { ContentStatus.UNSAVED }
         }
         currentTextField.update { newTFValue }
-        setCursorLocation(newTFValue.selection.start)
     }
 
     fun setBackgroundImage(uri: Uri) {
@@ -252,7 +263,7 @@ class HomeViewModel(
                     saveTextToFile(currentText)
                 }
                 contentStatus.update { ContentStatus.LOADING }
-                loadTextFromCloud()
+                loadTextFromCloud(resetSelection = true)
             }
         } else {
             println("no cloud repo")
@@ -269,7 +280,7 @@ class HomeViewModel(
                     saveTextToCloud(currentText)
                 }
             }
-            loadTextFromFile()
+            loadTextFromFile(resetSelection = true)
         }
     }
 
@@ -299,7 +310,9 @@ class HomeViewModel(
                     }
                 saveResult.fold(
                     onSuccess = {
+                        setCursorLocation(currentTextField.value.selection.start)
                         contentStatus.update { ContentStatus.SYNCED }
+                        println("saved.")
                     },
                     onFailure = { e ->
                         contentStatus.update { ContentStatus.SAVING_FAILED }
@@ -331,6 +344,10 @@ class HomeViewModel(
             }
         }
         saveResult.onSuccess {
+            runBlocking {
+                val cursorLocation = currentTextField.value.selection.start
+                setDataStoreValue(CURSOR_LOCATION_KEY, cursorLocation)
+            }
             contentStatus.update { ContentStatus.SYNCED }
         }
     }

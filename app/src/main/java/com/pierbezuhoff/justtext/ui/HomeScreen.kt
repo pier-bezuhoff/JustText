@@ -367,16 +367,17 @@ private fun TopBar(
                     ,
                 )
             ) {
+                // TODO: "..." cyclic animation
+                val statusText = when (contentStatus) {
+                    ContentStatus.LOADING -> "Loading..."
+                    ContentStatus.LOADING_FAILED -> "Loading failed."
+                    ContentStatus.SYNCED -> "Synced"
+                    ContentStatus.UNSAVED -> "Save"
+                    ContentStatus.SAVING -> "Saving..."
+                    ContentStatus.SAVING_FAILED -> "Saving failed."
+                }
                 Text(
-                    text = when (contentStatus) {
-                        ContentStatus.LOADING -> "Loading..."
-                        ContentStatus.LOADING_FAILED -> "Loading failed."
-                        ContentStatus.SYNCED -> "Synced"
-                        ContentStatus.UNSAVED -> "Save"
-                        ContentStatus.SAVING -> "Saving..."
-                        ContentStatus.SAVING_FAILED -> "Saving failed."
-                    }
-                    ,
+                    text = statusText,
                     style = MaterialTheme.typography.headlineSmall
                 )
             }

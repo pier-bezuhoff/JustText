@@ -11,7 +11,7 @@ class TextFileRepo(
 ) {
 
     suspend fun load(): Result<String> = withContext(Dispatchers.IO) {
-        runCatchingOnly({ it is IOException }) {
+        runCatchingOnly({ it is IOException || it is SecurityException }) {
             applicationContext.openFileInput(FILENAME)
                 ?.bufferedReader()
                 ?.useLines { lines ->
@@ -23,7 +23,7 @@ class TextFileRepo(
     }
 
     suspend fun save(text: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatchingOnly({ it is IOException }) {
+        runCatchingOnly({ it is IOException || it is SecurityException }) {
             applicationContext.openFileOutput(FILENAME, Context.MODE_PRIVATE)?.use {
                 it.write(text.toByteArray())
             } ?: throw IOException("null openFileInput($FILENAME)")

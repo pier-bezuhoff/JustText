@@ -59,6 +59,8 @@ class TextCloudRepo(
         // post retries can behave erratically with race conditioning get
         // leading to data erasure
         install(HttpRequestRetry) {
+            // weird: the more retries i put the more it uses (302) until getting the response...
+            // impatient much?
             retryIf(2) { request, response ->
                 request.method == HttpMethod.Get &&
                 !response.status.isSuccess()

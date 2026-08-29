@@ -3,9 +3,11 @@ package com.pierbezuhoff.justtext.ui
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.contextmenu.builder.TextContextMenuBuilderScope
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
 import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -15,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
@@ -73,8 +77,7 @@ fun TextScreen(
     val endPadding = with (density) {
         4.sp.toDp()
     }
-    // NOTE: rich text editing is not yet supported (since 2019..):
-    //  https://issuetracker.google.com/issues/135556699
+    val focusRequester = remember { FocusRequester() }
     val tfState = rememberTextFieldState(
         initialTFVState.value.text,
         initialTFVState.value.selection,
@@ -88,51 +91,32 @@ fun TextScreen(
                         replace(0, length, initialTFV.text)
                         selection = initialTFV.selection
                     }
+                    focusRequester.requestFocus()
                 }
         }
     }
     LaunchedEffect(tfState, onNewTFValue, lifecycleOwner.lifecycle) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            snapshotFlow { tfState.text }
+            snapshotFlow { TextFieldValue(tfState.text.toString(), tfState.selection) }
                 .debounce(200.milliseconds)
-                .collectLatest { text ->
-                    onNewTFValue(TextFieldValue(text.toString(), tfState.selection))
+                .collectLatest { tfv ->
+                    onNewTFValue(tfv)
                 }
         }
     }
+    // NOTE: rich text editing is not yet supported (since 2019..):
+    //  https://issuetracker.google.com/issues/135556699
     BasicTextField(
         state = tfState,
         modifier = modifier
             .fillMaxWidth()
             .padding(start = startPadding, end = endPadding)
+            .focusRequester(focusRequester)
             .appendTextContextMenuComponents {
-                item(SelectionContextAction.SelectLine, "Select line") {
-                    // note that this doesn't detect soft wraps
-                    val text = tfState.text
-                    val selection = tfState.selection
-                    val min = selection.min
-                    val max = selection.max
-                    val previousLineBreak = text.withIndex().lastOrNull { (i, char) ->
-                        i <= min && char == '\n'
-                    }?.index ?: -1
-                    val nextLineBreak = text.withIndex().firstOrNull { (i, char) ->
-                        i >= max && char == '\n'
-                    }?.index ?: text.length
-                    val newSelection = TextRange(previousLineBreak + 1, nextLineBreak)
-                    tfState.edit {
-                        this.selection = newSelection
-                    }
-                }
+                selectLineContextAction(tfState)
                 if (!readOnly) {
                     separator()
-                    item(SelectionContextAction.DeleteSelection, "Delete") {
-                        val selection = tfState.selection
-                        // not undoable, tho built-in cut is also not undoable
-                        tfState.edit {
-                            replace(selection.min, selection.max, "")
-                        }
-                        close()
-                    }
+                    deleteSelectionContextAction(tfState)
                 }
             }
         ,
@@ -141,6 +125,41 @@ fun TextScreen(
         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 50),
         cursorBrush = SolidColor(textColor),
     )
+}
+
+private fun TextContextMenuBuilderScope.selectLineContextAction(
+    tfState: TextFieldState
+) {
+    item(SelectionContextAction.SelectLine, "Select line") {
+        // note that this doesn't detect soft wraps
+        val text = tfState.text
+        val selection = tfState.selection
+        val min = selection.min
+        val max = selection.max
+        val previousLineBreak = text.withIndex().lastOrNull { (i, char) ->
+            i <= min && char == '\n'
+        }?.index ?: -1
+        val nextLineBreak = text.withIndex().firstOrNull { (i, char) ->
+            i >= max && char == '\n'
+        }?.index ?: text.length
+        val newSelection = TextRange(previousLineBreak + 1, nextLineBreak)
+        tfState.edit {
+            this.selection = newSelection
+        }
+    }
+}
+
+private fun TextContextMenuBuilderScope.deleteSelectionContextAction(
+    tfState: TextFieldState
+) {
+    item(SelectionContextAction.DeleteSelection, "Delete") {
+        val selection = tfState.selection
+        // not undoable, tho built-in cut is also not undoable
+        tfState.edit {
+            replace(selection.min, selection.max, "")
+        }
+        close()
+    }
 }
 
 private fun annotateUrlsInText(

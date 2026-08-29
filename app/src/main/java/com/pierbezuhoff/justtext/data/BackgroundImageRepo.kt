@@ -16,14 +16,18 @@ class BackgroundImageRepo(
         TaggedUri(Uri.fromFile(file))
 
     fun load(): Result<TaggedUri> {
-        if (file.exists()) {
-            return Result.success(getTaggedUri())
+        runCatchingOnly({ it is SecurityException }) {
+            if (file.exists()) {
+                return Result.success(getTaggedUri())
+            }
+        }.recover { e ->
+            return Result.failure(e)
         }
         return Result.failure(FileNotFoundException())
     }
 
     fun loadAndOverwrite(uri: Uri): Result<TaggedUri> =
-        runCatchingOnly({ it is IOException }) {
+        runCatchingOnly({ it is IOException || it is SecurityException }) {
             applicationContext.contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output ->
                     input.copyTo(output)
