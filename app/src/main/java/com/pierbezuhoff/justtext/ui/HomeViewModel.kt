@@ -318,7 +318,7 @@ class HomeViewModel(
                         contentStatus.update { ContentStatus.SAVING_FAILED }
                         e.printStackTrace()
                         launch {
-                            delay(3.seconds)
+                            delay(5.seconds)
                             contentStatus.update { ContentStatus.UNSAVED }
                         }
                     }

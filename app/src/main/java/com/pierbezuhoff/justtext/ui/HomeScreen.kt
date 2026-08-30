@@ -4,6 +4,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateValue
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -347,6 +353,7 @@ private fun TopBar(
     openBackgroundImagePicker: () -> Unit = {},
 ) {
     var showTextSourcePropertiesPopup: Boolean by remember { mutableStateOf(false) }
+    val progressTransition = rememberInfiniteTransition()
     TopAppBar(
         navigationIcon = {
             IconButton(onClick = quitApp) {
@@ -367,13 +374,25 @@ private fun TopBar(
                     ,
                 )
             ) {
-                // TODO: "..." cyclic animation
+                val progressDots = when (contentStatus) {
+                    ContentStatus.LOADING, ContentStatus.SAVING -> {
+                        val progress by progressTransition.animateValue(1, 4,
+                            Int.VectorConverter,
+                            infiniteRepeatable(
+                                tween(6_000, easing = LinearEasing)
+                            )
+                        )
+                        val dotCount = progress.coerceIn(1, 3)
+                        ".".repeat(dotCount)
+                    }
+                    else -> ""
+                }
                 val statusText = when (contentStatus) {
-                    ContentStatus.LOADING -> "Loading..."
+                    ContentStatus.LOADING -> "Loading$progressDots"
                     ContentStatus.LOADING_FAILED -> "Loading failed."
                     ContentStatus.SYNCED -> "Synced"
                     ContentStatus.UNSAVED -> "Save"
-                    ContentStatus.SAVING -> "Saving..."
+                    ContentStatus.SAVING -> "Saving$progressDots"
                     ContentStatus.SAVING_FAILED -> "Saving failed."
                 }
                 Text(
