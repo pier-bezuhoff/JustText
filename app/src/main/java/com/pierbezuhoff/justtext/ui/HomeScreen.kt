@@ -110,7 +110,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
-// MAYBE: add quick in-text search button
+private const val ENDPOINT_EXAMPLE = "example.com?q=123"
+
+// MAYBE: add in-text search
 @Suppress("ParamsComparedByRef")
 @Composable
 fun HomeScreenRoot(
@@ -378,9 +380,10 @@ private fun TopBar(
                     ContentStatus.LOADING, ContentStatus.SAVING -> {
                         val progress by progressTransition.animateValue(1, 4,
                             Int.VectorConverter,
-                            infiniteRepeatable(
-                                tween(6_000, easing = LinearEasing)
-                            )
+                            infiniteRepeatable(tween(
+                                durationMillis = 6_000,
+                                easing = LinearEasing
+                            ))
                         )
                         val dotCount = progress.coerceIn(1, 3)
                         ".".repeat(dotCount)
@@ -427,7 +430,7 @@ private fun TopBar(
                 )
                 if (showTextSourcePropertiesPopup) {
                     TextSourcePropertiesPopup(
-                        initialEndpoint = encryptedData.noteEndpoint ?: "example.com",
+                        initialEndpoint = encryptedData.noteEndpoint ?: ENDPOINT_EXAMPLE,
                         initialPassword = "", // you could show it but
                         dismiss = { showTextSourcePropertiesPopup = false },
                         setCloudRepoProperties = {

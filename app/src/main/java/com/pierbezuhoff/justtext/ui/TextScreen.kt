@@ -10,6 +10,8 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -70,13 +72,6 @@ fun TextScreen(
 //    val annotatedTFValue = tfValue.copy(
 //        annotatedString = annotateUrlsInText(tfValue.text, Color.Green)
 //    )
-    val density = LocalDensity.current
-    val startPadding = with (density) {
-        12.sp.toDp()
-    }
-    val endPadding = with (density) {
-        4.sp.toDp()
-    }
     val focusRequester = remember { FocusRequester() }
     val tfState = rememberTextFieldState(
         initialTFVState.value.text,
@@ -106,11 +101,10 @@ fun TextScreen(
     }
     // NOTE: rich text editing is not yet supported (since 2019..):
     //  https://issuetracker.google.com/issues/135556699
-    BasicTextField(
+    TextField(
         state = tfState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = startPadding, end = endPadding)
             .focusRequester(focusRequester)
             .appendTextContextMenuComponents {
                 selectLineContextAction(tfState)
@@ -123,7 +117,14 @@ fun TextScreen(
         readOnly = readOnly,
         textStyle = textStyle,
         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 50),
-        cursorBrush = SolidColor(textColor),
+        colors = TextFieldDefaults.colors(
+            focusedTextColor = textColor,
+            unfocusedTextColor = textColor,
+            disabledTextColor = textColor,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+        )
     )
 }
 
