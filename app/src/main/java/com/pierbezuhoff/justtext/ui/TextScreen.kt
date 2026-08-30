@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.pierbezuhoff.justtext.setTextAndSelection
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 import kotlinx.coroutines.FlowPreview
@@ -74,10 +75,7 @@ fun TextScreen(
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
             snapshotFlow { initialTFVState.value }
                 .collectLatest { initialTFV ->
-                    tfState.edit {
-                        replace(0, length, initialTFV.text)
-                        selection = initialTFV.selection
-                    }
+                    tfState.setTextAndSelection(initialTFV.text, initialTFV.selection)
                     focusRequester.requestFocus()
                 }
         }
@@ -183,7 +181,7 @@ private fun TextFieldBuffer.annotateUrlsInText(
     )
     val text = asCharSequence()
     val matches = urlRegex.findAll(text)
-    // we cannot display annotated string, with clickable links and stuff (yet),
+    // we cannot display annotated string with clickable links and stuff (yet),
     // only add span/paragraph styles
     matches.forEach { match ->
         addStyle(

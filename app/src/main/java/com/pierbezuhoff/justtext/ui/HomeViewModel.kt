@@ -12,12 +12,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.pierbezuhoff.justtext.JustTextApplication
 import com.pierbezuhoff.justtext.data.BackgroundImageRepo
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
@@ -68,12 +66,11 @@ data class UiState(
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via text file & dataStore
 class HomeViewModel(
-    application: JustTextApplication,
     private val dataStore: DataStore<Preferences>,
     private val encryptedDataStore: DataStore<EncryptedData>,
     private val textFileRepo: TextFileRepo,
     private val backgroundImageRepo: BackgroundImageRepo,
-) : AndroidViewModel(application) {
+) : ViewModel() {
     // maybe unify textFileRepo & textCloudRepo with same interface
     private var textCloudRepo: TextCloudRepo? = null
 
@@ -388,7 +385,6 @@ class HomeViewModel(
                 //val savedStateHandle = extras.createSavedStateHandle()
                 val applicationContext = application.applicationContext
                 return HomeViewModel(
-                    application = application as JustTextApplication,
                     dataStore = application.dataStore,
                     encryptedDataStore = application.encryptedDataStore,
                     textFileRepo = TextFileRepo(applicationContext),

@@ -45,7 +45,7 @@ android {
         disable += "NullSafeMutableLiveData"
     }
     packaging {
-        resources.pickFirsts.add("META-INF/INDEX.LIST")
+        resources.excludes.add("META-INF/INDEX.LIST")
     }
     testOptions {
         unitTests.all {
