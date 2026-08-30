@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.contextmenu.builder.TextContextMenuBuilderScope
 import androidx.compose.foundation.text.contextmenu.builder.item
 import androidx.compose.foundation.text.contextmenu.modifier.appendTextContextMenuComponents
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -11,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -20,16 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -64,11 +63,8 @@ fun TextScreen(
         lineHeight = (1.1f*fontSize).sp,
         lineBreak = LineBreak.Paragraph,
     )
-    // this triggers way too often
-//    val annotatedTFValue = tfValue.copy(
-//        annotatedString = annotateUrlsInText(tfValue.text, Color.Green)
-//    )
     val focusRequester = remember { FocusRequester() }
+    // we could hoist tfState to viewModel, but a lot of logic would need rethinking
     val tfState = rememberTextFieldState(
         initialTFVState.value.text,
         initialTFVState.value.selection,
@@ -104,14 +100,13 @@ fun TextScreen(
             .focusRequester(focusRequester)
             .appendTextContextMenuComponents {
                 selectLineContextAction(tfState)
-                if (!readOnly) {
-                    separator()
-                    deleteSelectionContextAction(tfState)
-                }
             }
         ,
         readOnly = readOnly,
         textStyle = textStyle,
+        outputTransformation = CustomOutputTransformation(
+            linkColor = textColor,
+        ),
         lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 50),
         colors = TextFieldDefaults.colors(
             focusedTextColor = textColor,
@@ -149,6 +144,7 @@ private fun TextContextMenuBuilderScope.selectLineContextAction(
     }
 }
 
+// kinda same as Cut
 private fun TextContextMenuBuilderScope.deleteSelectionContextAction(
     tfState: TextFieldState
 ) {
@@ -162,15 +158,22 @@ private fun TextContextMenuBuilderScope.deleteSelectionContextAction(
     }
 }
 
-private fun annotateUrlsInText(
-    text: String,
-    urlColor: Color,
-): AnnotatedString {
-    val textLinkStyles = TextLinkStyles(
-        style = SpanStyle(
-            color = urlColor,
-            textDecoration = TextDecoration.Underline,
-        ),
+@Immutable
+private data class CustomOutputTransformation(
+    val linkColor: Color,
+) : OutputTransformation {
+    override fun TextFieldBuffer.transformOutput() {
+        annotateUrlsInText(linkColor = linkColor)
+    }
+}
+
+private fun TextFieldBuffer.annotateUrlsInText(
+    linkColor: Color,
+) {
+    val linkStyle = SpanStyle(
+        textDecoration = TextDecoration.Underline,
+        fontStyle = FontStyle.Italic,
+        color = linkColor,
     )
     // reference: https://stackoverflow.com/a/8943487/7143065
     // and 'www.'... without 'https://' start
@@ -178,26 +181,39 @@ private fun annotateUrlsInText(
         "(\\b((https?|ftp|file)://|www\\.)[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])",
         setOf(RegexOption.IGNORE_CASE)
     )
-    return buildAnnotatedString {
-        var i = 0
-        val matches = urlRegex.findAll(text)
-        matches.forEach { match ->
-            append(text.substring(i until match.range.start))
-            val urlText = text.substring(match.range)
-            withLink(LinkAnnotation.Url(
-                url = urlText,
-                styles = textLinkStyles,
-                linkInteractionListener = {
-                    println("clicked $urlText")
-                } // on click
-            )) {
-                append(urlText)
-            }
-            i = match.range.last + 1
-        }
-        val endingText = text.substring(i until text.length)
-        append(endingText)
+    val text = asCharSequence()
+    val matches = urlRegex.findAll(text)
+    // we cannot display annotated string, with clickable links and stuff (yet),
+    // only add span/paragraph styles
+    matches.forEach { match ->
+        addStyle(
+            linkStyle,
+            match.range.first,
+            match.range.last + 1,
+        )
     }
+//    val textLinkStyles = TextLinkStyles(
+//        style = linkStyle
+//    )
+//    var i = 0
+//    buildAnnotatedString {
+//        matches.forEach { match ->
+//            append(text.substring(i until match.range.first))
+//            val urlText = match.value
+//            withLink(LinkAnnotation.Url(
+//                url = urlText,
+//                styles = textLinkStyles,
+//                linkInteractionListener = {
+//                    println("clicked $urlText")
+//                } // on click
+//            )) {
+//                append(urlText)
+//            }
+//            i = match.range.last + 1
+//        }
+//        val endingText = text.substring(i until text.length)
+//        append(endingText)
+//    }
 }
 
 @Preview(showBackground = true)

@@ -1,7 +1,9 @@
 package com.pierbezuhoff.justtext
 
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.TextRange
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -30,7 +32,7 @@ fun <T> Flow<T>.stateInWhileSubscribed(initialValue: T): StateFlow<T> =
 @Composable
 inline fun <T> Flow<T>?.collectWithLifecycle(
     minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
-    crossinline onEvent: suspend CoroutineScope.(T) -> Unit,
+    crossinline collector: suspend CoroutineScope.(T) -> Unit,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(this, lifecycleOwner.lifecycle) {
@@ -39,7 +41,7 @@ inline fun <T> Flow<T>?.collectWithLifecycle(
             // during configuration changes (default is Dispatchers.Main), idc tho
 //            withContext(Dispatchers.Main.immediate) {
             this@collectWithLifecycle?.collect { event ->
-                onEvent(event)
+                collector(event)
             }
 //            }
         }
@@ -85,4 +87,12 @@ inline fun <T, R> Result<T>.flatMapCatchingOnly(
             Result.failure(e)
         }
     )
+}
+
+fun TextFieldState.setTextAndSelection(
+    text: String,
+    selection: TextRange = TextRange.Zero,
+) = edit {
+    replace(0, length, text)
+    this.selection = selection
 }

@@ -75,8 +75,7 @@ class HomeViewModel(
     private val backgroundImageRepo: BackgroundImageRepo,
 ) : AndroidViewModel(application) {
     // maybe unify textFileRepo & textCloudRepo with same interface
-    val textCloudRepo: StateFlow<TextCloudRepo?>
-        field = MutableStateFlow<TextCloudRepo?>(null)
+    private var textCloudRepo: TextCloudRepo? = null
 
     /** initial texts, update each load */
     private val initialText = MutableStateFlow(LOADING_TEXT)
@@ -165,7 +164,7 @@ class HomeViewModel(
     private suspend fun loadTextFromCloud(
         resetSelection: Boolean = false,
     ): Result<String> =
-        textCloudRepo.value?.pull()
+        textCloudRepo?.pull()
             .let { pullResult ->
                 pullResult ?: Result.failure(Error("No cloud repo"))
             }.onSuccess { text ->
@@ -184,9 +183,7 @@ class HomeViewModel(
     private suspend fun initializedTextCloudRepoFromEncryptedData() {
         encryptedData.firstOrNull()?.let { data ->
             if (data.noteEndpoint != null && data.notePassword != null) {
-                textCloudRepo.update {
-                    TextCloudRepo(data.noteEndpoint, data.notePassword)
-                }
+                textCloudRepo = TextCloudRepo(data.noteEndpoint, data.notePassword)
             }
         }
     }
@@ -247,7 +244,7 @@ class HomeViewModel(
     }
 
     fun setCloudRepoProperties(properties: TextCloudRepo.Properties) {
-        textCloudRepo.update { TextCloudRepo(properties) }
+        textCloudRepo = TextCloudRepo(properties)
         viewModelScope.launch {
             encryptedDataStore.updateData { it.copy(
                 noteEndpoint = properties.endpoint,
@@ -257,7 +254,7 @@ class HomeViewModel(
     }
 
     private fun switchTextSourceToCloud() {
-        if (textCloudRepo.value != null) {
+        if (textCloudRepo != null) {
             val currentText = currentTextField.value.text
             switchTextSourceJob?.cancel()
             switchTextSourceJob = viewModelScope.launch {
@@ -366,13 +363,12 @@ class HomeViewModel(
     private suspend fun saveTextToCloud(
         text: String = currentTextField.value.text,
     ): Result<Unit> {
-        val repo = textCloudRepo.value
-            ?: return Result.failure(Error("No cloud repo"))
+        val repo = textCloudRepo ?: return Result.failure(Error("No cloud repo"))
         return repo.push(text)
     }
 
     fun freeResources() {
-        textCloudRepo.value?.freeResources()
+        textCloudRepo?.freeResources()
     }
 
     override fun onCleared() {
