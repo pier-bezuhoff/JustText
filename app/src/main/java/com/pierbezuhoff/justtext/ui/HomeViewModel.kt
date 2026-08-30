@@ -28,6 +28,7 @@ import com.pierbezuhoff.justtext.encryptedDataStore
 import com.pierbezuhoff.justtext.runCatchingOnly
 import com.pierbezuhoff.justtext.stateInWhileSubscribed
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,6 +115,8 @@ class HomeViewModel(
 
     val backgroundImageUri: StateFlow<TaggedUri?>
         field = MutableStateFlow<TaggedUri?>(null)
+
+    private var switchTextSourceJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -256,7 +259,8 @@ class HomeViewModel(
     private fun switchTextSourceToCloud() {
         if (textCloudRepo.value != null) {
             val currentText = currentTextField.value.text
-            viewModelScope.launch {
+            switchTextSourceJob?.cancel()
+            switchTextSourceJob = viewModelScope.launch {
                 if (contentStatus.value == ContentStatus.UNSAVED) {
                     contentStatus.update { ContentStatus.SAVING }
                     // saving locally is much faster, so no parallel
@@ -273,7 +277,8 @@ class HomeViewModel(
     private fun switchTextSourceToLocal() {
         // we have to snapshot current text, otherwise it can save text loaded from file...
         val currentText = currentTextField.value.text
-        viewModelScope.launch {
+        switchTextSourceJob?.cancel()
+        switchTextSourceJob = viewModelScope.launch {
             if (contentStatus.value == ContentStatus.UNSAVED) {
                 contentStatus.update { ContentStatus.SAVING }
                 launch(Dispatchers.Default) {
