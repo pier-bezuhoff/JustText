@@ -124,7 +124,14 @@ class HomeViewModel(
             else
                 loadTextFromCloud()
             loadResult.onFailure {
-                initialText.update { GREETING_TEXT }
+                if (isLocal) {
+                    initialText.update { GREETING_TEXT }
+                } else {
+                    println("cloud load failed, switching to local")
+                    loadTextFromFile(resetSelection = true).onFailure {
+                        initialText.update { GREETING_TEXT }
+                    }
+                }
             }
             println("ViewModel loaded persistent data")
         }

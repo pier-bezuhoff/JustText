@@ -1,5 +1,6 @@
 package com.pierbezuhoff.justtext.ui
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.contextmenu.builder.TextContextMenuBuilderScope
 import androidx.compose.foundation.text.contextmenu.builder.item
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -91,6 +93,7 @@ fun TextScreen(
     }
     // NOTE: rich text editing is not yet supported (since 2019..):
     //  https://issuetracker.google.com/issues/135556699
+    // TODO: remove vertical margins
     TextField(
         state = tfState,
         modifier = modifier
@@ -116,7 +119,8 @@ fun TextScreen(
             cursorColor = textColor, // vertical blinking '|'
             focusedIndicatorColor = textColor, // horizontal line at the bottom
             unfocusedIndicatorColor = textColor,
-        )
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     )
 }
 
