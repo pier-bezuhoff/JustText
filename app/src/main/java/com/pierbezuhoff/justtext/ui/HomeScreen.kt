@@ -484,6 +484,7 @@ private fun BoxScope.TextSourcePropertiesPopup(
     var endpoint by remember { mutableStateOf(initialEndpoint) }
     var password by remember { mutableStateOf(initialPassword) }
     val confirm by rememberUpdatedState {
+        // TODO: add 'https://' to endpoint when necessary
         setCloudRepoProperties(
             TextCloudRepo.Properties(endpoint, password)
         )

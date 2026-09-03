@@ -1,6 +1,7 @@
 package com.pierbezuhoff.justtext.ui
 
 import android.net.Uri
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
@@ -126,6 +127,7 @@ class HomeViewModel(
             loadResult.onFailure {
                 if (isLocal) {
                     initialText.update { GREETING_TEXT }
+                    contentStatus.update { ContentStatus.UNSAVED }
                 } else {
                     println("cloud load failed, switching to local")
                     loadTextFromFile(resetSelection = true).onFailure {
@@ -287,6 +289,12 @@ class HomeViewModel(
                 }
             }
             loadTextFromFile(resetSelection = true)
+                .onFailure {
+                    delay(5.seconds)
+                    initialText.update { GREETING_TEXT }
+                    setDataStoreValue(IS_LOCAL_KEY, true)
+                    contentStatus.update { ContentStatus.UNSAVED }
+                }
         }
     }
 
