@@ -9,20 +9,14 @@ import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -33,31 +27,21 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
-import com.pierbezuhoff.justtext.setTextAndSelection
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
-import kotlin.time.Duration.Companion.milliseconds
 
 private sealed interface SelectionContextAction {
     data object SelectLine : SelectionContextAction
     data object DeleteSelection : SelectionContextAction
 }
 
-@OptIn(FlowPreview::class)
 @Composable
 fun TextScreen(
-    initialTFVState: State<TextFieldValue>,
+    tfState: TextFieldState,
     fontSize: Int,
     textColor: Color,
     readOnly: Boolean,
     modifier: Modifier = Modifier,
-    onNewTFValue: (TextFieldValue) -> Unit = {},
 ) {
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = textColor,
@@ -66,39 +50,12 @@ fun TextScreen(
         lineHeight = (1.1f*fontSize).sp,
         lineBreak = LineBreak.Paragraph,
     )
-    val focusRequester = remember { FocusRequester() }
-    // we could hoist tfState to viewModel, but a lot of logic would need rethinking
-    val tfState = rememberTextFieldState(
-        initialTFVState.value.text,
-        initialTFVState.value.selection,
-    )
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(tfState, initialTFVState, lifecycleOwner.lifecycle) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            snapshotFlow { initialTFVState.value }
-                .collectLatest { initialTFV ->
-                    tfState.setTextAndSelection(initialTFV.text, initialTFV.selection)
-                    focusRequester.requestFocus()
-                }
-        }
-    }
-    LaunchedEffect(tfState, onNewTFValue, lifecycleOwner.lifecycle) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            snapshotFlow { TextFieldValue(tfState.text.toString(), tfState.selection) }
-                .debounce(200.milliseconds)
-                .collectLatest { tfv ->
-                    onNewTFValue(tfv)
-                }
-        }
-    }
     // NOTE: rich text editing is not yet supported (since 2019..):
     //  https://issuetracker.google.com/issues/135556699
-    // TODO: remove vertical margins
     TextField(
         state = tfState,
         modifier = modifier
             .fillMaxWidth()
-            .focusRequester(focusRequester)
             .appendTextContextMenuComponents {
                 selectLineContextAction(tfState)
             }
@@ -226,7 +183,7 @@ private fun TextScreenPreview() {
     ) }
     JustTextTheme(ColorTheme.Dark) {
         TextScreen(
-            initialTFVState = initialTFVState,
+            tfState = TextFieldState(initialTFVState.value.text),
             fontSize = 30,
             textColor = Color.Black,
             readOnly = false,

@@ -48,6 +48,33 @@ inline fun <T> Flow<T>?.collectWithLifecycle(
     }
 }
 
+@Composable
+fun LaunchedEffectWithLifecycle(
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+    block: suspend CoroutineScope.() -> Unit,
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect( lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(minActiveState) {
+            block()
+        }
+    }
+}
+
+@Composable
+fun LaunchedEffectWithLifecycle(
+    key1: Any?,
+    minActiveState: Lifecycle.State = Lifecycle.State.STARTED,
+    block: suspend CoroutineScope.() -> Unit,
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect( key1, lifecycleOwner.lifecycle) {
+        lifecycleOwner.repeatOnLifecycle(minActiveState) {
+            block()
+        }
+    }
+}
+
 /** alternative to [runCatching], but only catching exceptions satisfying
  * [catchFilter], non-cancellation exceptions by default */
 inline fun <C, R> C.runCatchingOnly(

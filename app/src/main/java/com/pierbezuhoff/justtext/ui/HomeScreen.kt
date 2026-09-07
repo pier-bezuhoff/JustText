@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,11 +92,14 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.pierbezuhoff.justtext.LaunchedEffectWithLifecycle
 import com.pierbezuhoff.justtext.R
 import com.pierbezuhoff.justtext.data.EncryptedData
 import com.pierbezuhoff.justtext.data.TaggedUri
@@ -106,9 +110,15 @@ import com.pierbezuhoff.justtext.ui.dialogs.FontSizeDialog
 import com.pierbezuhoff.justtext.ui.theme.ColorTheme
 import com.pierbezuhoff.justtext.ui.theme.JustTextTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val ENDPOINT_EXAMPLE = "example.com?q=123"
 
@@ -136,12 +146,14 @@ fun HomeScreenRoot(
     val snackbarHostState = remember { SnackbarHostState() }
     HomeScreen(
         uiState = uiState,
+        tfState = viewModel.tfState,
         backgroundImageUri = backgroundImageUri,
         encryptedData = encryptedData,
         modifier = modifier,
         snackbarHostState = snackbarHostState,
+        textFocusRequests = viewModel.textFocusRequests,
         quitApp = {
-            viewModel.persistState()
+            viewModel.saveBlocking()
             viewModel.freeResources()
             quitApp()
         },
@@ -155,12 +167,11 @@ fun HomeScreenRoot(
                 ActivityResultContracts.PickVisualMedia.ImageOnly
             ))
         },
-        onNewTFValue = viewModel::onNewTFValue,
     )
     when (openedDialogType) {
         DialogType.FONT_SIZE -> {
             FontSizeDialog(
-                fontSize = uiState.fontSize,
+                fontSize = uiState.fontSizeInSp,
                 setFontSize = { fontSize ->
                     viewModel.setFontSize(fontSize)
                     openedDialogType = null
@@ -197,27 +208,30 @@ fun HomeScreenRoot(
         }
         null -> {}
     }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner.lifecycle) {
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            withContext(Dispatchers.Default) {
-                while (isActive) {
-                    delay(AUTOSAVE_PERIOD)
-                    println("periodic autosave")
-                    viewModel.save()
-                }
+    LaunchedEffectWithLifecycle {
+        viewModel.observeTextChanges()
+    }
+    LaunchedEffectWithLifecycle {
+        withContext(Dispatchers.Default) {
+            while (isActive) {
+                delay(AUTOSAVE_PERIOD)
+                println("periodic autosave")
+                viewModel.save()
             }
         }
     }
 }
 
+@OptIn(FlowPreview::class)
 @Composable
 fun HomeScreen(
     uiState: UiState,
+    tfState: TextFieldState,
     backgroundImageUri: TaggedUri?,
     encryptedData: EncryptedData,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    textFocusRequests: SharedFlow<Unit>? = null,
     quitApp: () -> Unit = {},
     save: () -> Unit = {},
     switchTextSource: () -> Unit = {},
@@ -225,7 +239,6 @@ fun HomeScreen(
     openFontSizeDialog: () -> Unit = {},
     openColorsDialog: () -> Unit = {},
     openBackgroundImagePicker: () -> Unit = {},
-    onNewTFValue: (TextFieldValue) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -281,38 +294,41 @@ fun HomeScreen(
                 ,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f),
             ) {
-                val initialTFVState = remember(uiState.initialText) {
-                    mutableStateOf(
-                        TextFieldValue(uiState.initialText, uiState.textSelection)
-                    )
-                }
                 val textColor = uiState.textColor?.let { Color(it) }
                     ?: MaterialTheme.colorScheme.primary
+                val focusRequester = remember { FocusRequester() }
                 TextScreen(
-                    initialTFVState = initialTFVState,
-                    fontSize = uiState.fontSize,
+                    tfState = tfState,
+                    fontSize = uiState.fontSizeInSp,
                     textColor = textColor,
                     readOnly = when (uiState.contentStatus) {
                         ContentStatus.LOADING -> true
                         else -> false
                     },
-                    onNewTFValue = onNewTFValue,
+                    modifier = Modifier.focusRequester(focusRequester),
                 )
+                LaunchedEffectWithLifecycle(textFocusRequests) {
+                    textFocusRequests
+                        ?.debounce(500.milliseconds)
+                        ?.collectLatest {
+                            focusRequester.requestFocus()
+                        }
+                }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, device = "id:pixel_5")
 @Composable
 private fun HomeScreenPreview() {
     JustTextTheme(ColorTheme.Dark) {
         HomeScreen(
             uiState = UiState(
                 contentStatus = ContentStatus.SYNCED,
-                initialText = "hi!!!!!",
-                fontSize = 30,
+                fontSizeInSp = 30,
             ),
+            tfState = TextFieldState("hi!!!!!"),
             backgroundImageUri = null,
             encryptedData = EncryptedData(),
         )

@@ -25,7 +25,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.JustText.Starting"
-            android:windowSoftInputMode="stateHidden|adjustResize"
+            android:windowSoftInputMode="stateVisible|adjustResize"
         >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
