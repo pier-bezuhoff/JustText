@@ -14,14 +14,14 @@ kotlin {
 
 android {
     namespace = "com.pierbezuhoff.justtext"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.pierbezuhoff.justtext"
         minSdk = 24 // Android 7.0
-        targetSdk = 36
-        versionCode = 4
-        versionName = "1.2"
+        targetSdk = 37
+        versionCode = 3
+        versionName = "1.4"
     }
 
     buildTypes {
@@ -56,14 +56,14 @@ android {
 
 dependencies {
     implementation(platform(libs.compose.bom))
-    implementation(libs.ui)
-    implementation(libs.ui.graphics)
-    implementation(libs.ui.tooling.preview)
-    implementation(libs.material3)
-    implementation(libs.material3.adaptive)
-    implementation(libs.activity.compose)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material3.adaptive)
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.activity.compose)
     implementation(libs.core.ktx)
     implementation(libs.core.splashScreen) // splash screen backport
     implementation(libs.datastore)
@@ -81,8 +81,8 @@ dependencies {
     implementation(libs.colormath.compose)
     implementation(libs.slf4j.api)
     implementation(libs.logback)
-    debugImplementation(libs.ui.tooling)
-    debugImplementation(libs.ui.test.manifest)
+    debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
     testImplementation(libs.kotest.junit5)
     testImplementation(libs.kotest.assertion.core)
     testImplementation(libs.kotest.property)

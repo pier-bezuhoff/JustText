@@ -68,6 +68,7 @@ data class UiState(
     val imageBackgroundColor: ULong? = null,
 )
 
+// MAYBE: add undo/redo
 // NOTE: VM survives config changes but not OOM-related process kill,
 //  but we call VM.persistState in MainActivity.onPause,
 //  so the important elements of UiState are saved via text file & dataStore
@@ -85,6 +86,8 @@ class HomeViewModel(
     val encryptedData: Flow<EncryptedData> = encryptedDataStore.data
 
     val tfState: TextFieldState = TextFieldState(initialText = LOADING_TEXT)
+    /** Used to upd synced/unsaved status */
+    private var lastText: String = LOADING_TEXT
 
     val uiState = combine(
         dataStore.data, contentStatus
@@ -169,6 +172,7 @@ class HomeViewModel(
                     tfState.setTextAndSelection(text, selection)
                 }
                 textFocusRequests.tryEmit(Unit)
+                lastText = text
                 contentStatus.update { ContentStatus.SYNCED }
 //                println("text file loaded: $text")
             }.onFailure {
@@ -191,6 +195,7 @@ class HomeViewModel(
                     tfState.setTextAndSelection(text, selection)
                 }
                 textFocusRequests.tryEmit(Unit)
+                lastText = text
                 contentStatus.update { ContentStatus.SYNCED }
 //                println("cloud text loaded: $text"("cloud text loaded: $text"))
             }.onFailure {
@@ -242,13 +247,14 @@ class HomeViewModel(
         }
     }
 
+    // FIX: becomes Unsaved on resume
     @OptIn(FlowPreview::class)
     suspend fun observeTextChanges() {
         snapshotFlow { tfState.text }
             .debounce(200.milliseconds)
             .collectLatest { text ->
                 when (contentStatus.value) {
-                    ContentStatus.SYNCED ->
+                    ContentStatus.SYNCED if (text.toString() != lastText) ->
                         contentStatus.update { ContentStatus.UNSAVED }
                     else -> {}
                 }
@@ -331,15 +337,17 @@ class HomeViewModel(
             // unsaved | saving failed
             else -> viewModelScope.launch {
                 contentStatus.update { ContentStatus.SAVING }
+                val text = tfState.text.toString()
                 val saveResult =
                     if (uiState.value.isLocal) {
-                        saveTextToFile()
+                        saveTextToFile(text)
                     } else {
-                        saveTextToCloud()
+                        saveTextToCloud(text)
                     }
                 saveResult.fold(
                     onSuccess = {
                         setCursorLocation(tfState.selection.start)
+                        lastText = text
                         contentStatus.update { ContentStatus.SYNCED }
                         println("saved.")
                     },
@@ -357,6 +365,7 @@ class HomeViewModel(
     }
 
     fun saveBlocking() {
+        val text = tfState.text.toString()
         val saveResult = when (contentStatus.value) {
             ContentStatus.SYNCED ->
                 Result.success(Unit)
@@ -365,12 +374,13 @@ class HomeViewModel(
             // unsaved, saving failed
             else -> runBlocking {
                 if (uiState.value.isLocal)
-                    saveTextToFile()
+                    saveTextToFile(text)
                 else
-                    saveTextToCloud()
+                    saveTextToCloud(text)
             }
         }
         saveResult.onSuccess {
+            lastText = text
             contentStatus.update { ContentStatus.SYNCED }
             runBlocking {
                 setDataStoreValue(CURSOR_LOCATION_KEY, tfState.selection.start)
